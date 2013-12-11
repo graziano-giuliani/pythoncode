@@ -21,16 +21,27 @@ module oss_ir
   integer , parameter :: mxmols = 20
 
   ! 2010 CODATA
-  real(4) , parameter :: h = 6.62606957E-27
-  real(4) , parameter :: c = 2.99792458E+10
+  !real(4) , parameter :: h = 6.62606957E-27
+  !real(4) , parameter :: c = 2.99792458E+10
+  !real(4) , parameter :: b = 1.380662E-16
+  !real(4) , parameter :: c1 = 2.0E0*h*c*c
+  !real(4) , parameter :: c2 = h*c/b
+  !real(4) , parameter :: pi = 3.1415926535897932384626433832795029E0
+  !real(4) , parameter :: deg2rad = pi/180.0E0
+  !real(4) , parameter :: rad2deg = 180.0E0/pi
+  !real(4) , parameter :: grav = 9.80665E0
+  !real(4) , parameter :: rair = 10.0E0/grav
+
+  ! Original constants
+  real(4) , parameter :: h = 6.626176E-27
+  real(4) , parameter :: c = 2.997925E+10
   real(4) , parameter :: b = 1.380662E-16
   real(4) , parameter :: c1 = 2.0E0*h*c*c
   real(4) , parameter :: c2 = h*c/b
-  real(4) , parameter :: pi = 3.1415926535897932384626433832795029E0
-  real(4) , parameter :: deg2rad = pi/180.0E0
-  real(4) , parameter :: rad2deg = 180.0E0/pi
-  real(4) , parameter :: grav = 9.80665E0
-  real(4) , parameter :: rair = 10.0E0/grav
+  real(4) , parameter :: pi = 3.14159265
+  real(4) , parameter :: deg2rad = 0.017453293E0
+  real(4) , parameter :: rair = 1.020408163E0
+
   ! Weighting factor derivative wrt optical depth, for linear-in-tau,
   ! in low-OD limit
   real(4) , parameter :: dvint = 10.0E0
@@ -274,14 +285,13 @@ module oss_ir
                        rad,xkt_tmp,xkemrf_tmp)
         do ich = 1 , nch(nn)
           ich0 = ichmap(ich,nn)
-          y(ich0) = y(ich0) + real(rad*coef(ich,nn))
-          xkt(1:nparg,ich0) = xkt(1:nparg,ich0) + &
-                              real(xkt_tmp(1:nparg)*coef(ich,nn))
+          y(ich0) = y(ich0) + rad*coef(ich,nn)
+          xkt(1:nparg,ich0) = xkt(1:nparg,ich0) + xkt_tmp(1:nparg)*coef(ich,nn)
           do i = 1 , 2
             xx = xkemrf_tmp(i)*coef(ich,nn)
-            xkemrf(i,ip0-1,ich0) = xkemrf(i,ip0-1,ich0) + real(xx*(1.0E0-a))
-            xkemrf(i,ip0,ich0) = xkemrf(i,ip0,ich0) + real(xx*a)
-            paxkemrf(i,ich0) = paxkemrf(i,ich0) + real(xx)
+            xkemrf(i,ip0-1,ich0) = xkemrf(i,ip0-1,ich0) + xx*(1.0E0-a)
+            xkemrf(i,ip0,ich0) = xkemrf(i,ip0,ich0) + xx*a
+            paxkemrf(i,ich0) = paxkemrf(i,ich0) + xx
           end do
         end do
       end do
@@ -300,18 +310,19 @@ module oss_ir
                     xkt_tmp,xkemrf_tmp)
         do ich = 1 , nch(nn)
           ich0 = ichmap(ich,nn)
-          y(ich0) = y(ich0) + real(rad*coef(ich,nn))
+          y(ich0) = y(ich0) + rad*coef(ich,nn)
           xkt(1:nparg,ich0) = xkt(1:nparg,ich0) + &
-                              real(xkt_tmp(1:nparg)*coef(ich,nn))
+                              xkt_tmp(1:nparg)*coef(ich,nn)
           do i = 1 , 2
             xx = xkemrf_tmp(i)*coef(ich,nn)
-            xkemrf(i,ip0-1,ich0) = xkemrf(i,ip0-1,ich0) + real(xx*(1.0E0-a))
-            xkemrf(i,ip0,ich0) = xkemrf(i,ip0,ich0) + real(xx*a)
-            paxkemrf(i,ich0) = paxkemrf(i,ich0) + real(xx)
+            xkemrf(i,ip0-1,ich0) = xkemrf(i,ip0-1,ich0) + xx*(1.0E0-a)
+            xkemrf(i,ip0,ich0) = xkemrf(i,ip0,ich0) + xx*a
+            paxkemrf(i,ich0) = paxkemrf(i,ich0) + xx
           end do
         end do
       end do
     end if
+
   contains
 
   subroutine planck_set(vn,t,ts,nlay)
@@ -1565,7 +1576,7 @@ module oss_ir
     pref = rpref
     do k = 1 , nlayod
       do i = 1 , ntmpod
-        tmptab(i,k) = real(rtmptab(k,i))
+        tmptab(i,k) = rtmptab(k,i)
       end do
     end do
     pavlref(1:nlev-1) = 0.5E0*(pref(1:nlev-1)+pref(2:nlev))
@@ -1599,8 +1610,8 @@ module oss_ir
       allocate(vwvn(nfsmp))
       allocate(sunrad(nfsmp))
     end if
-    sfgrd = real(rsfgrd)
-    emrf(1,:) = real(remrf)
+    sfgrd = rsfgrd
+    emrf(1,:) = remrf
     emrf(2,:) = 1.0E0-emrf(1,:)
     vwvn = rvwvn
     sunrad = rsunrad
@@ -1673,7 +1684,7 @@ module oss_ir
     end if
     do ismp = 1 , nfsmp
       do nc = 1 , nchmax
-        coef(nc,ismp) = real(rcoef(ismp,nc))
+        coef(nc,ismp) = rcoef(ismp,nc)
         ichmap(nc,ismp) = inichmap(ismp,nc)
       end do
     end do
@@ -1681,8 +1692,8 @@ module oss_ir
     do ismp = 1 , nfsmp
       do nt = 1 , ntmpod
         do l = 1 , nlayod
-          kh2o(l,nt,ismp) = real(rkh2o(ismp,nt,l))
-          dkh2o(l,nt,ismp) = real(rdkh2o(ismp,nt,l))
+          kh2o(l,nt,ismp) = rkh2o(ismp,nt,l)
+          dkh2o(l,nt,ismp) = rdkh2o(ismp,nt,l)
         end do
       end do
     end do
@@ -1707,16 +1718,15 @@ module oss_ir
       hinmol = count(himols(ismp,:)>0)
       do nt = 1 , ntmpod
         do l = 1 , nlayod
-          kfix(l,nt,ismp) = real(rkfix(ismp,nt,l) * wvptab(l,1))
+          kfix(l,nt,ismp) = rkfix(ismp,nt,l) * wvptab(l,1)
         end do
       end do
       iflag(2:iimol) = 0
       do nt = 1 , ntmpod
         do l = 1 , nlayod
-          ktot = real(rkfix(ismp,nt,l))
+          ktot = rkfix(ismp,nt,l)
           do ks = 2 , hinmol
-            kbuf(ks-1) = real(rkvar(ismp,nt,l,ks-1) * &
-              wvptab(l,himols(ismp,ks)+2))
+            kbuf(ks-1) = rkvar(ismp,nt,l,ks-1) * wvptab(l,himols(ismp,ks)+2)
             ktot = ktot + kbuf(ks-1)
           end do
           do ks = 2 , hinmol
@@ -1735,7 +1745,7 @@ module oss_ir
           do nt = 1 , ntmpod
             do l = 1 , nlayod
               kfix(l,nt,ismp) = kfix(l,nt,ismp) + &
-                real(rkvar(ismp,nt,l,ks-1) * wvptab(l,imol+2))
+                rkvar(ismp,nt,l,ks-1) * wvptab(l,imol+2)
             end do
           end do
         end if
@@ -1744,7 +1754,7 @@ module oss_ir
       imols(1:kk,ismp) = maps(himols(ismp,imols_indx(1:kk)))
       do nt = 1 , ntmpod
         do l = 1 , nlayod
-          kvar(1:kk-1,l,nt,ismp) = real(rkvar(ismp,nt,l,imols_indx(2:kk)-1))
+          kvar(1:kk-1,l,nt,ismp) = rkvar(ismp,nt,l,imols_indx(2:kk)-1)
         end do
       end do
     end do

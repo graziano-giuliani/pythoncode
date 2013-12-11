@@ -528,18 +528,29 @@ if ( __name__ == '__main__' ):
   a.compute(93,1,92,xg,1.0000200010836124E-002,43.695999145507812,89.0,
                y,xkt,xkemrf,paxkemrf,puser)
   rootgrp = Dataset('test.nc', 'w', format='NETCDF4')
-  nchand = rootgrp.createDimension('nch', nch)
+  nchand = rootgrp.createDimension('channels', nch)
   nsped = rootgrp.createDimension('nspe', nspe)
-  npargd = rootgrp.createDimension('nparg', nparg)
+  npargd = rootgrp.createDimension('levels', 91)
   jj = rootgrp.createDimension('jj', 2)
-  ncx = rootgrp.createVariable('x','f4',('nch',))
-  ncy = rootgrp.createVariable('y','f4',('nch',))
-  ncxkt = rootgrp.createVariable('xkt','f4',('nch','nparg',))
-  ncxkemrf = rootgrp.createVariable('xkemrf','f4',('nch','nspe','jj',))
-  ncpaxkemrf = rootgrp.createVariable('paxkemrf','f4',('nch','jj',))
+  jj = rootgrp.createDimension('sfc', 1)
+  ncx = rootgrp.createVariable('x','f4',('channels',))
+  ncy = rootgrp.createVariable('y','f4',('channels',))
+  nckt = rootgrp.createVariable('Kt','f4',('channels','levels'))
+  nckwv = rootgrp.createVariable('Kwv','f4',('channels','levels'))
+  nckco2 = rootgrp.createVariable('Kco2','f4',('channels','levels'))
+  ncko3 = rootgrp.createVariable('Ko3','f4',('channels','levels'))
+  nckskt = rootgrp.createVariable('Kskt','f4',('channels','sfc'))
+  ncksp = rootgrp.createVariable('Ksp','f4',('channels','sfc'))
+  ncxkemrf = rootgrp.createVariable('xkemrf','f4',('channels','nspe','jj',))
+  ncpaxkemrf = rootgrp.createVariable('paxkemrf','f4',('channels','jj',))
   ncx[:] = a.cwvn
   ncy[:] = y
-  ncxkt[:] = xkt
+  nckt[:] = np.transpose(xkt[0:91,:])
+  nckskt[:] = np.transpose(xkt[91,:])
+  ncksp[:] = np.transpose(xkt[92,:])
+  nckwv[:] = np.transpose(xkt[93:184,:])
+  nckco2[:] = np.transpose(xkt[184:275,:])
+  ncko3[:] = np.transpose(xkt[275:366,:])
   ncxkemrf[:] = xkemrf
   ncpaxkemrf[:] = paxkemrf
   rootgrp.close()

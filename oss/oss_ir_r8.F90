@@ -21,16 +21,27 @@ module oss_ir
   integer , parameter :: mxmols = 20
 
   ! 2010 CODATA
-  real(8) , parameter :: h = 6.62606957D-27
-  real(8) , parameter :: c = 2.99792458D+10
-  real(8) , parameter :: b = 1.380662D-16
-  real(8) , parameter :: c1 = 2.0D0*h*c*c
-  real(8) , parameter :: c2 = h*c/b
-  real(8) , parameter :: pi = 3.1415926535897932384626433832795029D0
-  real(8) , parameter :: deg2rad = pi/180.0D0
-  real(8) , parameter :: rad2deg = 180.0D0/pi
-  real(8) , parameter :: grav = 9.80665D0
-  real(8) , parameter :: rair = 10.0D0/grav
+  !real(8) , parameter :: h = 6.62606957D-27
+  !real(8) , parameter :: c = 2.99792458D+10
+  !real(8) , parameter :: b = 1.380662D-16
+  !real(8) , parameter :: c1 = 2.0D0*h*c*c
+  !real(8) , parameter :: c2 = h*c/b
+  !real(8) , parameter :: pi = 3.1415926535897932384626433832795029D0
+  !real(8) , parameter :: deg2rad = pi/180.0D0
+  !real(8) , parameter :: rad2deg = 180.0D0/pi
+  !real(8) , parameter :: grav = 9.80665D0
+  !real(8) , parameter :: rair = 10.0D0/grav
+
+  ! Original constants
+  real(4) , parameter :: h = 6.626176E-27
+  real(4) , parameter :: c = 2.997925E+10
+  real(4) , parameter :: b = 1.380662E-16
+  real(4) , parameter :: c1 = 2.0E0*h*c*c
+  real(4) , parameter :: c2 = h*c/b
+  real(4) , parameter :: pi = 3.14159265
+  real(4) , parameter :: deg2rad = 0.017453293E0
+  real(4) , parameter :: rair = 1.020408163E0
+
   ! Weighting factor derivative wrt optical depth, for linear-in-tau,
   ! in low-OD limit
   real(8) , parameter :: dvint = 10.0D0
