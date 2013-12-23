@@ -216,6 +216,12 @@ module oss_ir
     ipsfcg = inipsfcg
     itempg = initempg
     itsking = initsking
+    if ( imolind(1) < 1 ) then
+      ! Assume "default" ordering
+      do i = 1 , size(imolid)
+        imolind(i) = ipsfcg+1+(i-1)*(itsking-1)
+      end do
+    end if
 
     !======================================================================
     !     initialize radiance vector and k-matrix
@@ -1490,24 +1496,20 @@ module oss_ir
 
   end subroutine ossdrv_ir
 
-  subroutine set_imols(iimolind,iimolid)
+  subroutine set_imols(nm,iimolid,iimolind)
     implicit none
-    integer , intent(in) , dimension(:) :: iimolind
-    integer , intent(in) , dimension(:) :: iimolid
+    integer , intent(in) :: nm
+    integer , intent(in) , dimension(nm) :: iimolid
+    integer , intent(in) , dimension(nm) , optional :: iimolind
     integer :: k , n
-    ! Sanity check
-    if ( size(iimolind) /= size(iimolid) ) then
-      call fatal(__FILE__,__LINE__, &
-        'Requested molecular species and their index do not match')
-    end if
-    n = size(iimolid)
-    if ( n > mxhmol ) then
+    if ( nm > mxhmol ) then
       call fatal(__FILE__,__LINE__,'Exceeded mxhmol size!')
     end if
     if ( iimolid(1) /= 1 ) then
       call fatal(__FILE__,__LINE__, &
         'Water vapor must be specified in molecular selection!')
     end if
+    n = nm
     do k = 2 , n
       if ( iimolid(k) == 0 ) then
         n = k -1
@@ -1520,19 +1522,23 @@ module oss_ir
     if ( nmol > 0 ) then
       if ( n /= nmol ) then
         write(stderr_ftn,*) 'Resetting NMOL !'
-        deallocate(imolind)
         deallocate(imolid)
+        deallocate(imolind)
         nmol = n
-        allocate(imolind(nmol))
         allocate(imolid(nmol))
+        allocate(imolind(nmol))
       end if
     else
       nmol = n
-      allocate(imolind(nmol))
       allocate(imolid(nmol))
+      allocate(imolind(nmol))
     end if
     imolid(1:nmol) = iimolid(1:nmol)
-    imolind(1:nmol) = iimolind(1:nmol)
+    if ( present(iimolind) ) then
+      imolind(1:nmol) = iimolind(1:nmol)
+    else
+      imolind(1:nmol) = -1
+    end if
   end subroutine set_imols
 
   subroutine set_hitran(rpref,rtmptab)

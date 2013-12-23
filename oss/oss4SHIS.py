@@ -2,7 +2,7 @@
 
 class oss4SHIS:
   """Use HITRAN precomputed tables to compute oss forward model (ir)"""
-  def __init__(self,emiss,solar,od,imolid,imolind):
+  def __init__(self,emiss,solar,od,imolid=None,imolind=None):
     import numpy as np
     from asolar import asolar
     from emissivity import emissivity
@@ -12,7 +12,14 @@ class oss4SHIS:
     a = asolar(solar)
     o = hitran(od)
     self.oss = oss_ir
-    self.oss.set_imols(imolind,imolid)
+    if ( imolid is not None ):
+      uimolid = imolid
+    else:
+      uimolid = np.array([1,2,3])
+    if ( imolind is not None ):
+      self.oss.set_imols(uimolid,imolind)
+    else:
+      self.oss.set_imols(uimolid)
     pref = o.get('pref')
     tmptab = o.get('tmptab')
     self.oss.set_hitran(pref,tmptab)
@@ -49,8 +56,6 @@ class oss4SHIS:
 
 if ( __name__ == '__main__' ):
   import numpy as np
-  imolid = np.array([1,2,3])
-  imolind = np.array([94,185,276])
   from netCDF4 import Dataset
   xg = np.array([
    195.49699401855469      ,
@@ -514,8 +519,7 @@ if ( __name__ == '__main__' ):
 
   a = oss4SHIS('../data/emissivity.nc',
                '../data/solar_irradiances.nc',
-               '../data/leo.iasi.0.05.nc',
-               imolid,imolind)
+               '../data/leo.iasi.0.05.nc')
   nspe = a.nfs
   nch = a.nchan
   nparg = len(xg)
