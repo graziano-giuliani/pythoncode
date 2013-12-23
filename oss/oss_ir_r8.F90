@@ -1,20 +1,62 @@
+!
+! Copyright (c) 2013 Graziano Giuliani
+! Original code from oss forward model (ir). aer inc. 2004
+! No copyright on source file known.
+!
+! Permission is hereby granted, free of charge, to any person obtaining a
+! copy of this software and associated documentation files (the "Software"),
+! to deal in the Software without restriction, including without limitation
+! the rights to use, copy, modify, merge, publish, distribute, sublicense,
+! and/or sell copies of the Software, and to permit persons to whom the
+! Software is furnished to do so, subject to the following conditions:
+!
+! The above copyright notice and this permission notice shall be included
+! in all copies or substantial portions of the Software.
+!
+! THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+! OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+! FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+! THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+! LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+! FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+! DEALINGS IN THE SOFTWARE.
+!
 module oss_ir
+
+  use iso_fortran_env , only : error_unit
+
+  implicit none
 
   private
 
-  public :: ossdrv_ir
-  public :: fatal
+  ! -----------------------------------------------
+  ! Public Interfaces which can be called by python
+  ! ===============================================
+
+  ! Setup of the OSS Forward Model. To be called in the below sequence
   public :: set_imols
   public :: set_solar_irradiance
   public :: set_hitran
   public :: set_hitran_absorption_coefficients
+
+  ! Obtain the radiances and Jacobians from the OSS Forward Model
+  public :: ossdrv_ir
+
+  ! Release memory allocated by the module and cleanup
   public :: release
 
-  integer , parameter :: stderr_ftn = 0
+  ! Internal. Should not be called.
+  public :: fatal
+
+  integer , parameter :: stderr_ftn = error_unit
 
   !integer , parameter :: rk8 = selected_real_kind(P=13,R=300)
   !integer , parameter :: rk4 = selected_real_kind(P= 6,R=37)
 
+  !
+  ! Dimension parameter. To allow greater values, need to recompile
+  ! the code.
+  !
   integer , parameter :: mxlev = 101
   integer , parameter :: mxlay = mxlev - 1
   integer , parameter :: mxhmol = 25
@@ -46,6 +88,8 @@ module oss_ir
   ! in low-OD limit
   real(8) , parameter :: dvint = 10.0D0
   real(8) , parameter :: epsiln = 1.0D-05
+
+  ! Filter out
   real(8) , parameter :: odfac = 0.0D0
 
   integer :: ntmpod = -1
@@ -60,6 +104,8 @@ module oss_ir
   integer :: ipsfcg = -1
   integer :: itempg = -1
   integer :: itsking = -1
+
+  ! Internal dynamical storage
 
   integer , dimension(:) , allocatable :: imolind
   integer , dimension(:) , allocatable :: imolid
@@ -90,6 +136,7 @@ module oss_ir
   logical :: variablegrid = .false.
   logical :: is_planck_set = .false.
 
+  ! Internal Static storage. See dimension parameters above
   real(8) , dimension(mxlay) :: ap1
   real(8) , dimension(mxlay) :: ap2
   real(8) , dimension(mxlay) :: at1_p1
@@ -176,18 +223,22 @@ module oss_ir
   subroutine ossdrv_ir(nparg,nchan,nspe,nuser,initempg,initsking,inipsfcg,xg, &
       pobs,obsang,sunang,y,xkt,xkemrf,paxkemrf,puser)
     !---------------------------------------------------------------------------
-    ! purpose: driver for the ir radiative transfer model.
-    !          computes both radiances and their jacobians wrt geophysical
+    ! purpose: Driver for the ir radiative transfer model.
+    !          Computes both radiances and their jacobians wrt geophysical
     !          parameters.
-    ! xg:      profile vector of geophysical parmaters (containing
-    !          temperature and constiutuents profiles, surface
-    !          pressure and skin temperature, and cloud parameters
-    ! emrf:    vector of mw surface emissivities.
-    ! path:    array of quantities characterizing the atmospehric
-    !          path in plane-parallel atmosphere.
-    ! y:       vector of radiances.
-    ! xkt:     array of derivatives of the radiances wrt geophysical parameters.
-    ! xkemrf:  array of radiance derivatives wrt surface emissivities.
+    ! Input:
+    !   xg       Profile vector of geophysical parmaters (containing
+    !            temperature and constituents profiles, surface
+    !            pressure and skin temperature, and cloud parameters
+    !   pobs     Pressure at observation point
+    !   obsang   Angle of observation
+    !   sunang   Sun angle
+    !   puser    Vertical profile pressure levels
+    ! Output:
+    !   y        Vector of radiances.
+    !   xkt      Array of derivatives of the radiances wrt geophysical
+    !            parameters.
+    !   xkemrf   Array of radiance derivatives wrt surface emissivities.
     !---------------------------------------------------------------------------
     implicit none
     integer , intent(in) :: nparg , nchan , nspe , nuser
@@ -1588,6 +1639,7 @@ module oss_ir
     pavlref(1:nlev-1) = 0.5D0*(pref(1:nlev-1)+pref(2:nlev))
   end subroutine set_hitran
 
+  ! remrf : vector of mw surface emissivities.
   subroutine set_solar_irradiance(rsfgrd,remrf,rvwvn,rsunrad)
     implicit none
     real(4) , intent(in) , dimension(:) :: rsfgrd
