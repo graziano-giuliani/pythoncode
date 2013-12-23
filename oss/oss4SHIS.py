@@ -15,7 +15,7 @@ class oss4SHIS:
     if ( imolid is not None ):
       uimolid = imolid
     else:
-      uimolid = np.array([1,2,3])
+      uimolid = np.array([1,2,3],np.int32)
     if ( imolind is not None ):
       self.oss.set_imols(uimolid,imolind)
     else:

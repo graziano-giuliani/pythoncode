@@ -173,7 +173,7 @@ module oss_ir
     stop
   end subroutine fatal
 
-  subroutine ossdrv_ir(nparg,nchan,nspe,nuser,inipsfcg,initempg,initsking,xg, &
+  subroutine ossdrv_ir(nparg,nchan,nspe,nuser,initempg,initsking,inipsfcg,xg, &
       pobs,obsang,sunang,y,xkt,xkemrf,paxkemrf,puser)
     !---------------------------------------------------------------------------
     ! purpose: driver for the ir radiative transfer model.
