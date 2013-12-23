@@ -91,6 +91,11 @@ if ( __name__ == '__main__' ):
   import numpy as np
   from netCDF4 import Dataset
 
+  # Initialize oss forward model
+  a = oss4SHIS('../data/emissivity.nc',
+               '../data/solar_irradiances.nc',
+               '../data/leo.iasi.0.05.nc')
+
   # Input data
   indata = {}
   indata['tskin'] = 299.82998657226562
@@ -227,19 +232,19 @@ if ( __name__ == '__main__' ):
   indata['obsang'] = 43.695999145507812
   indata['sunang'] = 89.0
 
-  a = oss4SHIS('../data/emissivity.nc',
-               '../data/solar_irradiances.nc',
-               '../data/leo.iasi.0.05.nc')
+  # Output data (empty first call)
   outdata = {}
-  nspe = a.nfs
-  nch = a.nchan
+
   #for i in range(0,200):
   #  print(i)
+  #  a.compute(indata,outdata)
   a.compute(indata,outdata)
+
+  nlev = len(indata['temp'])
   rootgrp = Dataset('test.nc', 'w', format='NETCDF4')
-  nchand = rootgrp.createDimension('channels', nch)
-  nsped = rootgrp.createDimension('nspe', nspe)
-  npargd = rootgrp.createDimension('levels', 91)
+  nchand = rootgrp.createDimension('channels', a.nchan)
+  nsped = rootgrp.createDimension('nspe', a.nfs)
+  npargd = rootgrp.createDimension('levels', nlev)
   jj = rootgrp.createDimension('jj', 2)
   jj = rootgrp.createDimension('sfc', 1)
   ncx = rootgrp.createVariable('x','f4',('channels',))
@@ -254,12 +259,12 @@ if ( __name__ == '__main__' ):
   ncpaxkemrf = rootgrp.createVariable('paxkemrf','f4',('channels','jj',))
   ncx[:] = a.cwvn
   ncy[:] = outdata['y']
-  nckt[:] = np.transpose(outdata['xkt'][0:91,:])
-  nckskt[:] = np.transpose(outdata['xkt'][91,:])
-  ncksp[:] = np.transpose(outdata['xkt'][92,:])
-  nckwv[:] = np.transpose(outdata['xkt'][93:184,:])
-  nckco2[:] = np.transpose(outdata['xkt'][184:275,:])
-  ncko3[:] = np.transpose(outdata['xkt'][275:366,:])
+  nckt[:] = np.transpose(outdata['xkt'][0:nlev,:])
+  nckskt[:] = np.transpose(outdata['xkt'][nlev,:])
+  ncksp[:] = np.transpose(outdata['xkt'][nlev+1,:])
+  nckwv[:] = np.transpose(outdata['xkt'][nlev+2:nlev+2+nlev,:])
+  nckco2[:] = np.transpose(outdata['xkt'][2*nlev+2:2*nlev+2+nlev,:])
+  ncko3[:] = np.transpose(outdata['xkt'][3*nlev+2:3*nlev+2+nlev,:])
   ncxkemrf[:] = np.transpose(outdata['xkemrf'])
   ncpaxkemrf[:] = np.transpose(outdata['paxkemrf'])
   rootgrp.close()
