@@ -1,14 +1,32 @@
 #!/usr/bin/env python
-
+#
+# Copyright (c) 2013 Paolo Antonelli, Tiziana Cherubini, Graziano Giuliani
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
 class oss4SHIS:
   """Use HITRAN precomputed tables to compute oss forward model (ir)"""
-  def __init__(self,emiss,solar,od,imolid=None,imolind=None):
+  def __init__(self,solar,od,imolid=None,imolind=None):
     import numpy as np
     from asolar import asolar
-    from emissivity import emissivity
     from hitran import hitran
     from ossir import oss_ir
-    e = emissivity(emiss)
     a = asolar(solar)
     o = hitran(od)
     self.oss = oss_ir
@@ -25,10 +43,8 @@ class oss4SHIS:
     self.oss.set_hitran(pref,tmptab)
     self.cwvn = o.get('cWvn')
     vwvn = o.get('vwvn')
-    sfgrd = e.get('SfGrd')
-    emrf = e.get('EmRf')
     sunrad = a.get(vwvn)
-    self.oss.set_solar_irradiance(sfgrd,emrf,vwvn,sunrad)
+    self.oss.set_solar_irradiance(vwvn,sunrad)
     wvptab = o.get('wvptab')
     kfix = o.get('kfix')
     dkh2o = o.get('dkh2o')
@@ -79,25 +95,33 @@ class oss4SHIS:
       outdata['paxkemrf'] = np.zeros((2,self.nchan),np.float32,order='F')
     if ( 'pressure' in indata.keys() ):
       self.oss.ossdrv_ir(initempg,initsking,inipsfcg,xg,pobs,obsang,sunang,
+         indata['sfgrd'],indata['emrf'],
          outdata['y'],outdata['xkt'],outdata['xkemrf'],outdata['paxkemrf'],
          puser=indata['pressure'])
     else:
       self.oss.ossdrv_ir(initempg,initsking,inipsfcg,xg,pobs,obsang,sunang,
+         indata['sfgrd'],indata['emrf'],
          outdata['y'],outdata['xkt'],outdata['xkemrf'],outdata['paxkemrf'])
   def __del__(self):
     self.oss.release( )
 
+#
+# Unit test of the above class
+#
 if ( __name__ == '__main__' ):
   import numpy as np
   from netCDF4 import Dataset
+  from emissivity import emissivity
 
   # Initialize oss forward model
-  a = oss4SHIS('../data/emissivity.nc',
-               '../data/solar_irradiances.nc',
+  a = oss4SHIS('../data/solar_irradiances.nc',
                '../data/leo.iasi.0.05.nc')
 
   # Input data
+  e = emissivity('../data/emissivity.nc')
   indata = {}
+  indata['sfgrd'] = e.get('SfGrd')
+  indata['emrf'] = e.get('EmRf')
   indata['tskin'] = 299.82998657226562
   indata['psf'] = 997.13000488281250
   indata['temp'] = np.array([

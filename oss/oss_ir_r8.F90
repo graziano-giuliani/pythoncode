@@ -1,5 +1,5 @@
 !
-! Copyright (c) 2013 Graziano Giuliani
+! Copyright (c) 2013 Paolo Antonelli, Tiziana Cherubini, Graziano Giuliani
 ! Original code from oss forward model (ir). aer inc. 2004
 ! No copyright on source file known.
 !
@@ -96,7 +96,6 @@ module oss_ir
   integer :: nlayod = -1
   integer :: nlev = -1
   integer :: nmol = -1
-  integer :: nsf = -1
   integer :: nfsmp = -1
   integer :: nchmax = -1
   integer :: imolvalid = -1
@@ -112,8 +111,6 @@ module oss_ir
   real(8) , dimension(:) , allocatable :: pref
   real(8) , dimension(:) , allocatable :: pavlref
   real(8) , dimension(:,:) , allocatable :: tmptab
-  real(8) , dimension(:) , allocatable :: sfgrd
-  real(8) , dimension(:,:) , allocatable :: emrf
   real(8) , dimension(:) , allocatable :: sunrad
   real(8) , dimension(:) , allocatable :: vwvn
 
@@ -220,8 +217,8 @@ module oss_ir
     stop
   end subroutine fatal
 
-  subroutine ossdrv_ir(nparg,nchan,nspe,nuser,initempg,initsking,inipsfcg,xg, &
-      pobs,obsang,sunang,y,xkt,xkemrf,paxkemrf,puser)
+  subroutine ossdrv_ir(nparg,nchan,nspe,nsf,nuser,initempg,initsking,i &
+      inipsfcg,xg,pobs,obsang,sunang,sfgrd,remrf,y,xkt,xkemrf,paxkemrf,puser)
     !---------------------------------------------------------------------------
     ! purpose: Driver for the ir radiative transfer model.
     !          Computes both radiances and their jacobians wrt geophysical
@@ -230,6 +227,7 @@ module oss_ir
     !   xg       Profile vector of geophysical parmaters (containing
     !            temperature and constituents profiles, surface
     !            pressure and skin temperature, and cloud parameters
+    !   remrf    Vector of mw surface emissivities
     !   pobs     Pressure at observation point
     !   obsang   Angle of observation
     !   sunang   Sun angle
@@ -241,8 +239,10 @@ module oss_ir
     !   xkemrf   Array of radiance derivatives wrt surface emissivities.
     !---------------------------------------------------------------------------
     implicit none
-    integer , intent(in) :: nparg , nchan , nspe , nuser
+    integer , intent(in) :: nparg , nchan , nsf , nspe , nuser
     real(8) , intent(in) , dimension(nparg) :: xg
+    real(8) , intent(in) , dimension(nsf) :: sfgrd
+    real(8) , intent(in) , dimension(nsf) :: remrf
     integer , intent(in) :: inipsfcg , initempg , initsking
     real(8) , intent(in) :: obsang , sunang , pobs
     real(8) , intent(in) , dimension(nuser) , optional :: puser
@@ -254,6 +254,7 @@ module oss_ir
     real(8) , dimension(mxlev) :: xgtmp
     real(8) , dimension(2) :: vemrf
     real(8) , dimension(2) :: xkemrf_tmp
+    real(8) , dimension(2,nsf) :: emrf
     real(8) , dimension(nparg) :: xkt_tmp
     real(8) :: umu , umu0 , delphi , vn , a , fbeam , rad , xx
     real(8) :: tsfc
@@ -273,6 +274,9 @@ module oss_ir
         imolind(i) = ipsfcg+1+(i-1)*(itsking-1)
       end do
     end if
+
+    emrf(1,:) = remrf
+    emrf(2,:) = 1.0D0-emrf(1,:)
 
     !======================================================================
     !     initialize radiance vector and k-matrix
@@ -334,7 +338,7 @@ module oss_ir
         call osstran_vg(n2,nn)
         !---interpolate input surface emissivity to node wavenumber
         vn = vwvn(nn)
-        call vinterp(emrf,vn,sfgrd,2,ip0,a,vemrf)
+        call vinterp(emrf,vn,sfgrd,nsf,2,ip0,a,vemrf)
         fbeam = sunrad(nn)
         if ( .not. sun ) fbeam = 0.0D0
         !---perform rt calculations !clear sky model
@@ -360,7 +364,7 @@ module oss_ir
         call osstran(n1,n2,nn)
         !---interpolate input surface emissivity to node wavenumber
         vn = vwvn(nn)
-        call vinterp(emrf,vn,sfgrd,2,ip0,a,vemrf)
+        call vinterp(emrf,vn,sfgrd,nsf,2,ip0,a,vemrf)
         fbeam = sunrad(nn)
         if ( .not. sun ) fbeam = 0.0D0
         !---perform rt calculations !clear sky model
@@ -792,12 +796,12 @@ module oss_ir
     xkemrf(2) = draddrsfc
   end subroutine ossrad
 
-  subroutine vinterp(datin,vn,sfgrd,nxdim,ip0,coefint,datout)
+  subroutine vinterp(datin,vn,sfgrd,nsf,nxdim,ip0,coefint,datout)
     !-------------------------------------
     ! purpose: interpolation in wavenumber
     !-------------------------------------
     implicit none
-    integer , intent(in) :: nxdim
+    integer , intent(in) :: nxdim , nsf
     real(8) , intent(in) , dimension(:,:) :: datin
     real(8) , intent(in) :: vn
     real(8) , intent(in) , dimension(:) :: sfgrd
@@ -1639,38 +1643,24 @@ module oss_ir
     pavlref(1:nlev-1) = 0.5D0*(pref(1:nlev-1)+pref(2:nlev))
   end subroutine set_hitran
 
-  ! remrf : vector of mw surface emissivities.
-  subroutine set_solar_irradiance(rsfgrd,remrf,rvwvn,rsunrad)
+  subroutine set_solar_irradiance(rvwvn,rsunrad)
     implicit none
-    real(4) , intent(in) , dimension(:) :: rsfgrd
-    real(4) , intent(in) , dimension(:) :: remrf
     real(8) , intent(in) , dimension(:) :: rvwvn
     real(8) , intent(in) , dimension(:) :: rsunrad
-    if ( nsf > 0 ) then
-      if ( size(rsfgrd) /= nsf ) then
-        write(stderr_ftn,*) 'Resetting NSF , NFSMP !'
-        deallocate(sfgrd)
-        deallocate(emrf)
+    if ( nfsmp > 0 ) then
+      if ( size(vwvn) /= nfsmp ) then
+        write(stderr_ftn,*) 'Resetting NFSMP !'
         deallocate(vwvn)
         deallocate(sunrad)
-        nsf = size(rsfgrd)
         nfsmp = size(rvwvn)
-        allocate(sfgrd(nsf))
-        allocate(emrf(2,nsf))
         allocate(vwvn(nfsmp))
         allocate(sunrad(nfsmp))
       end if
     else
-      nsf = size(rsfgrd)
       nfsmp = size(rvwvn)
-      allocate(sfgrd(nsf))
-      allocate(emrf(2,nsf))
       allocate(vwvn(nfsmp))
       allocate(sunrad(nfsmp))
     end if
-    sfgrd = dble(rsfgrd)
-    emrf(1,:) = dble(remrf)
-    emrf(2,:) = 1.0D0-emrf(1,:)
     vwvn = rvwvn
     sunrad = rsunrad
   end subroutine set_solar_irradiance
@@ -1825,7 +1815,6 @@ module oss_ir
     nlayod = -1
     nlev = -1
     nmol = -1
-    nsf = -1
     nfsmp = -1
     nchmax = -1
     if ( allocated(imolind) ) deallocate(imolind)
