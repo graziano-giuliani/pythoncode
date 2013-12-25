@@ -49,9 +49,9 @@ Wed 11 dec 2013, 15.59.41, CET
     # iteration (including the first)
     # Note: Updating the jacobian matrix K is very slow and may be unnecessary
     # Enter control flags for first retrieval,      e.g. [1 0 0 0 0 0]
-    self.EstimateK = np.array([1,1,1,1,1,1,1,1,1,1,1])
+    self.EstimateK = np.array([1,1,1,1,1,1,1,1,1,1,1],dtype=int)
     # Enter Environmental Parameter to Retrieve (e.g. [-2 -1 0 1 2 3])
-    self.Jvar = np.array([-2,-1,0,1,3])
+    self.Jvar = np.array([-2,-1,0,1,3],dtype=int)
     self.Iteration_limit = sum(self.EstimateK)
     # Get input parameters
     # Array of observations
@@ -60,7 +60,8 @@ Wed 11 dec 2013, 15.59.41, CET
     # Field of View Angle
     self.FOVangle = np.array(df.variables['FOVangle'][:])
     # Indeces for selected channels to be used with Forward Model
-    self.indx = np.array(df.variables['indxselchannel'][:])
+    # Python indexes start from 0
+    self.indx = np.array(df.variables['indxselchannel'][:],dtype=int)-1
     # FOV latitude
     self.fov_latitude = np.array(df.variables['Latitude'][:])
     # whole observation wavenumber grid
@@ -71,7 +72,7 @@ Wed 11 dec 2013, 15.59.41, CET
     #
     df = Dataset(os.path.join(self.datapath,'fg.nc'))
     self.p = np.array(df.variables['p'][:])
-    self.xdim = np.array(df.variables['xdim'][:])
+    self.xdim = np.array(df.variables['xdim'][:],dtype=int)
     df.close( )
     # Get emissivity Principal Componets (model functions)
     df = Dataset(os.path.join(self.datapath,'emissivitymodel.nc'))
@@ -83,7 +84,7 @@ Wed 11 dec 2013, 15.59.41, CET
     df.close()
     # Get indices for selected variables within whole state vector
     df = Dataset(os.path.join(self.datapath,'apriori.nc'))
-    self.state_var_indx = np.array(df.variables['varindx'][:])
+    self.state_var_indx = np.array(df.variables['varindx'][:],dtype=int)-1
     df.close()
     self.pressure_grid = self.p[0:self.xdim[0]]
 

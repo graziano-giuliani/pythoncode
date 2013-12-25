@@ -4,6 +4,9 @@ import numpy as np
 import os
 import sys
 
+class residuals:
+  pass
+
 class radiance:
   """radiance class
 
@@ -52,7 +55,7 @@ Wed 11 dec 2013, 15.59.41, CET
     self.ems = self.ske
     self.eme = self.ems+self.xdim[5]
 
-  def compute(self,x):
+  def compute_forward(self,x):
     from mirto_code_configuration import surface_emissivity
     # Define Input Parameters
     # Construct prof structure from input state vector (x, p)
@@ -96,6 +99,7 @@ Wed 11 dec 2013, 15.59.41, CET
     self.F = self.outdata['y']
 
   def estimate_K(self,x):
+    from mirto_code_configuration import surface_emissivity
     """
 Compute the jacobian K using the selected model
     """
@@ -112,7 +116,7 @@ Compute the jacobian K using the selected model
     krow = len(self.cx.wnR)
 
     # Inizialize the K matrix with nans
-    jac = np.zeros((krow,sum(xdim[0:5])))
+    jac = np.zeros((krow,sum(xdim[0:6])))
     jac.fill(np.NAN)
     wvn = self.cx.wnR
 
@@ -150,13 +154,11 @@ Compute the jacobian K using the selected model
       jcb = np.transpose(self.outdata['xkt'][self.sks:self.ske,:])
       jac[:,self.sks:self.ske] = jcb
     if ( SEflag > 0 ):
-      # margin used in calculation about selwn
-      calcmargin = 70
       # compute surface emissivity
       emiss = surface_emissivity(self.cx,x)
       interp_EmissVal = np.interp(wvn,
             emis.wnSurfEmiss,emis.SurfEmiss_values,0.999,0.999)
-      jcb = np.transpose(self.outdata['paxkemrf'][1,:])
+      jcb = np.transpose(self.outdata['paxkemrf'][0,:])
       self.cx.Kse = jcb
       w = interp_EmissVal*(1.0-interp_EmissVal)
       self.cx.Kse_logit = jcb*w
@@ -168,6 +170,37 @@ Compute the jacobian K using the selected model
         jac[:,i] = interp_SurfEmissModelFunctions[:,i]*jcb*w
     self.K = jac
     self.wnK = wvn
+
+  def compute_residuals(self):
+   """ 
+Compute the obs minus calc difference, yobs_minus_yhat
+
+Input:
+  R   = the observed radiance
+  wnR = the observed wavenumber scale
+  F      = the calculated radiance
+  wnF    = the calculated wavenumber scale
+  selwn  = selected channels from the wavenumber array to use in
+           obs minus calc residual
+
+Output:
+   out1 = radiance difference vector yobs_minus_yhat
+   out2 = wavenumber scale in 1-to-1 correspondence with yobs_minus_yhat
+   out3 = length of radiance perturbation vector yobs_minus_yhat
+   """
+   Robs = self.cx.R[0,:]
+   wnRobs = self.cx.wnR
+   F = self.F
+   wnF = self.wnF
+
+   # Extract the selected channels for the retrieval
+   jj = self.cx.indx.astype(int)
+
+   xres = residuals()
+   xres.yobs_minus_yhat = Robs[jj] - F[jj]
+   xres.wnyobs_minus_yhat = wnF[jj]
+
+   return(xres)
 
 #
 # Unit test of the above
@@ -189,7 +222,7 @@ if ( __name__ == '__main__' ):
   ap = apriori(cx)
   rad = radiance(cx)
   x = ap.x0
-  rad.compute(x)
+  rad.compute_forward(x)
   rootgrp = Dataset('radiance.nc', 'w', format='NETCDF4')
   nchan = rootgrp.createDimension('nchan', len(rad.wnF))
   ncwn = rootgrp.createVariable('wn','f4',('nchan',))
@@ -198,4 +231,5 @@ if ( __name__ == '__main__' ):
   ncra[:] = rad.F
   rootgrp.close()
   rad.estimate_K(x)
-  print(rad.K)
+  res = rad.compute_residuals( )
+  print (res.yobs_minus_yhat)

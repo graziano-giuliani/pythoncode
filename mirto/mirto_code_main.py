@@ -1,9 +1,14 @@
 #!/usr/bin/env python
 # mirto_code_main.py
-import numpy as num
+import numpy as np
 import cProfile, pstats, io
 import mirto_code_configuration
+import mirto_code_compute_F
 import sys
+
+# Empty class to store result
+class mirto_state:
+  pass
 
 def mirto_code_main(datapath,oss,profiling=None):
   """solution = mirto_code_main
@@ -34,6 +39,7 @@ Thu 12 dec 2013, 10.32.53, CET
   control = mirto_code_configuration.control(datapath,oss)
   obsErr = mirto_code_configuration.obsErr(control)
   apriori = mirto_code_configuration.apriori(control)
+  state = mirto_state()
 
   # Assing values for the state vector
   xhat = apriori.x0
@@ -49,7 +55,7 @@ Thu 12 dec 2013, 10.32.53, CET
   #   (same as apriori.X0)
   xhat_pre = apriori.xa
 
-  fm = radiance(control)
+  fm = mirto_code_compute_F.radiance(control)
 
   while (Iteration <= control.Iteration_limit):
     #
@@ -58,17 +64,31 @@ Thu 12 dec 2013, 10.32.53, CET
     #
     #
     # print('... Compute_F')
-    fm.compute(xhat)
+    fm.compute_forward(xhat)
     fm.estimate_K(xhat)
+    residuals = fm.compute_residuals( )
+
+    # Subselect from forward model output the channels used for the
+    # inversion
+    fm.F = fm.F[control.indx]
+    fm.wnF = fm.wnF[control.indx]
+    fm.wnK = fm.wnK[control.indx]
+
+    # Subselect from forward model output (Jacobians) and from
+    # whole apriori the variables actually retrieved.
+    apriori.Sa_ret = apriori.Sa[control.state_var_indx,control.state_var_indx]
+    apriori.SaInv_ret = apriori.SaInv[control.state_var_indx,
+                                      control.state_var_indx]
+    state.xhat = xhat[control.state_var_indx]
+    state.xhat_pre = xhat_pre[control.state_var_indx]
+    state.xa = apriori.xa[control.state_var_indx]
+
+    # Select Channels used and the variables actually retrieved
+    fm.K = fm.K[control.indx,control.state_var_indx]
+
+    sys.exit()
 
 # UP TO HERE
-
-    residuals = mirto_code_compute_residuals(control,fm)
-
-    fm = mirto_code_extract_selected_channels(control,fm)
-
-    [apriori, fm, state] = mirto_code_extract_selected_variables(apriori,
-                     control, fm, xhat, xhat_pre)
 
     norm = mirto_code_compute_chi_square(state, residuals, obsErr, apriori)
 
