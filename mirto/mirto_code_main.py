@@ -11,8 +11,15 @@ import sys
 class mirto_state:
   pass
 
+class mirto_history:
+  def __init__(self):
+    self.measurement_space_only = []
+    self.d2 = []
+
 class mirto_norm:
-  pass
+  def __init__(self):
+    self.measurement_space_only = np.NAN
+    self.solution_space_only = np.NAN
 
 class mirto:
   def __init__(self,datapath,oss):
@@ -21,19 +28,19 @@ class mirto:
     self.obsErr = mirto_code_configuration.obsErr(self.control)
     self.apriori = mirto_code_configuration.apriori(self.control)
     self.state = mirto_state()
+    self.norm = mirto_norm()
+    self.history = mirto_history()
 
   def compute_chi_square(self,residuals):
-    norm = mirto_norm()
-    norm.measurement_space_only = (
+    self.norm.measurement_space_only = (
       np.dot(
              np.dot(residuals.yobs_minus_yhat.T,self.obsErr.SeInv),
              residuals.yobs_minus_yhat/len(residuals.yobs_minus_yhat)) )
-    norm.solution_space_only = (
+    self.norm.solution_space_only = (
       np.dot(
              np.dot(self.state.xhat-self.state.xhat_pre.T,
                     self.apriori.SaInv_ret),
              self.state.xhat-self.state.xhat_pre/len(self.state.xhat) ) )
-    return(norm)
 
   def update_solution(self,fm,residuals):
     self.control.KtSeInv = np.dot(fm.K.T,self.obsErr.SeInv)
@@ -104,42 +111,33 @@ class mirto:
       self.state.xhat_pre = xhat_pre[self.control.state_var_indx]
       self.state.xa = self.apriori.xa[self.control.state_var_indx]
 
-      norm = self.compute_chi_square(residuals)
+      self.compute_chi_square(residuals)
 
       self.update_solution(fm,residuals)
 
-      sys.exit()
-
-# UP TO HERE
-
-      [state, self.control] = mirto_code_ml_update_xhat(state, fm, self.apriori,
-                     self.obsErr, residuals, self.control)
-
-      historical.measurement_space_only[Iteration] = norm.measurement_space_only
-      historical.d2[Iteration] = state.d2
+      self.history.measurement_space_only.append(
+              self.norm.measurement_space_only)
+      self.history.d2.append(self.state.d2)
 
       if (Iteration > 1):
-        ref_norm = min(historical.measurement_space_only[0:end-1]);
-        if  (norm.measurement_space_only <= ref_norm):
+        ref_norm = min(self.history.measurement_space_only[:]);
+        if  (self.norm.measurement_space_only <= ref_norm):
           print('Residual decreasing, solution saved')
-          self.control.gamma = self.control.gamma/2
-          xxdel = (100.0 * (ref_norm - norm.measurement_space_only) /
-                            norm.measurement_space_only)
+          self.control.gamma = self.control.gamma/2.0
+          xxdel = (100.0 * (ref_norm - self.norm.measurement_space_only) /
+                            self.norm.measurement_space_only)
           print('UWPHYSRET residuals decreased by ',xxdel)
         else:
           self.control.gamma = self.control.gamma*5.0
-          xxdel = (100.0 * (norm.measurement_space_only - ref_norm) /
-                            norm.measurement_space_only)
+          xxdel = (100.0 * (self.norm.measurement_space_only - ref_norm) /
+                            self.norm.measurement_space_only)
           print('UWPHYSRET residuals increased by ',xxdel)
           print('Residual increasing, solution NOT saved')
-          his_d2 = min(abs(historical.d2[0:end-1]))
-      else:
-        ref_d2 = 10.0**10
-        ref_norm = 10.0**15
+          his_d2 = min(abs(self.history.d2[:]))
 
-      xhat[self.control.state_var_indx] = state.xhat
+      xhat[self.control.state_var_indx] = self.state.xhat
 
-      if (abs(state.d2) < 0.03 * length(self.control.state_var_indx)):
+      if (abs(self.state.d2) < 0.03 * len(self.control.state_var_indx)):
         print('****  CONVERGED!!! ****')
         break
       else:
@@ -149,11 +147,11 @@ class mirto:
           # Note: Don't update xhat if this is the final iteration or it
           # will overwrite the solution
           print('... Update_xhat')
-          xhat_pre[self.control.state_var_indx] = state.xhat
-          xhat[self.control.state_var_indx] = state.xhat_new
+          xhat_pre[self.control.state_var_indx] = self.state.xhat
+          xhat[self.control.state_var_indx] = self.state.xhat_new
       Iteration = Iteration+1
 
-    return(state)
+    return(self.state)
 
     if ( profiling is not None ):
       if ( profiling == True ):
