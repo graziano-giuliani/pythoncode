@@ -105,13 +105,14 @@ Compute the jacobian K using the selected model
     """
     xdim = self.xdim
     Jvar = self.cx.Jvar
-    SEflag = np.count_nonzero(np.where(Jvar==-2))
-    SKTflag = np.count_nonzero(np.where(Jvar==-1))
-    Tflag = np.count_nonzero(np.where(Jvar==0))
-    WVflag = np.count_nonzero(np.where(Jvar==1))
-    CO2flag = np.count_nonzero(np.where(Jvar==2))
-    O3flag = np.count_nonzero(np.where(Jvar==3))
-    
+
+    SEflag = np.size(np.where(Jvar==-2)) > 0
+    SKTflag = np.size(np.where(Jvar==-1)) > 0
+    Tflag = np.size(np.where(Jvar==0)) > 0
+    WVflag = np.size(np.where(Jvar==1)) > 0
+    CO2flag = np.size(np.where(Jvar==2)) > 0
+    O3flag = np.size(np.where(Jvar==3)) > 0
+
     # Set number of channels
     krow = len(self.cx.wnR)
 
@@ -120,10 +121,10 @@ Compute the jacobian K using the selected model
     jac.fill(np.NAN)
     wvn = self.cx.wnR
 
-    if ( Tflag > 0 ):
+    if ( Tflag ):
       jcb = np.transpose(self.outdata['xkt'][self.tds:self.tde,:])
       jac[:,self.tds:self.tde] = np.fliplr(jcb)
-    if ( WVflag > 0 ):
+    if ( WVflag ):
       #  convert from log(vmr in ppv) to vmr in ppmv
       vmr = 1.e6*np.exp(x[self.wvs:self.wve])
       # w = 1.e-6*(self.Mw/self.Md)*vmr 
@@ -132,7 +133,7 @@ Compute the jacobian K using the selected model
       jcb = np.transpose(self.outdata['xkt'][self.wvs:self.wve,:])
       # Jacobians in log(q)
       jac[:,self.wvs:self.wve] = np.fliplr(jcb)*w_mat
-    if ( CO2flag > 0 ):
+    if ( CO2flag ):
       # convert from log(vmr in ppv) to vmr in ppmv
       # vmr = x[self.cos:self.coe]
       # w = 1.e-6*(self.Mc/self.Md)*vmr
@@ -141,7 +142,7 @@ Compute the jacobian K using the selected model
       # jac[:,self.cos:self.coe] = np.fliplr(jcb)*w_mat
       # Jacobians in ppmv
       jac[:,self.cos:self.coe] = np.fliplr(jcb)*(self.Mc/self.Md)*1.e-6
-    if ( O3flag > 0 ):
+    if ( O3flag ):
       # convert from log(vmr in ppv) to vmr in ppmv
       vmr = np.exp(x[self.ozs:self.oze])
       # w = 1.e-6*(self.Mo/self.Md)*vmr
@@ -150,12 +151,12 @@ Compute the jacobian K using the selected model
       jcb = np.transpose(self.outdata['xkt'][self.ozs:self.oze,:])
       # jacobians in log(q)
       jac[:,self.ozs:self.oze] = np.fliplr(jcb)*w_mat
-    if ( SKTflag > 0 ):
+    if ( SKTflag ):
       jcb = np.transpose(self.outdata['xkt'][self.sks:self.ske,:])
       jac[:,self.sks:self.ske] = jcb
-    if ( SEflag > 0 ):
+    if ( SEflag ):
       # compute surface emissivity
-      emiss = surface_emissivity(self.cx,x)
+      emis = surface_emissivity(self.cx,x)
       interp_EmissVal = np.interp(wvn,
             emis.wnSurfEmiss,emis.SurfEmiss_values,0.999,0.999)
       jcb = np.transpose(self.outdata['paxkemrf'][0,:])
@@ -164,10 +165,11 @@ Compute the jacobian K using the selected model
       self.cx.Kse_logit = jcb*w
       # Note: The jacobian we want is the lblrtm surface jacobian times each
       # SurfEmissModelFunctions interpolated to the calculation scale.
-      interp_SurfEmissModelFunctions = np.interp(wvn,
-            emis.wnSurfEmissModelFunctions,emis.SurfEmissModelFunctions,0.0,0.0)
       for i in range(self.ems,self.eme):
-        jac[:,i] = interp_SurfEmissModelFunctions[:,i]*jcb*w
+        interp_SurfEmissModelFunctions = np.interp(wvn,
+            emis.wnSurfEmissModelFunctions,
+            emis.SurfEmissModelFunctions[i-self.ems,:],0.0,0.0)
+        jac[:,i] = interp_SurfEmissModelFunctions*jcb*w
     self.K = jac
     self.wnK = wvn
 
