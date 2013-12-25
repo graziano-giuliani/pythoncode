@@ -20,10 +20,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 #
+import numpy as np
+
 class oss4SHIS:
   """Use HITRAN precomputed tables to compute oss forward model (ir)"""
   def __init__(self,solar,od,imolid=None,imolind=None):
-    import numpy as np
     from asolar import asolar
     from hitran import hitran
     from ossir import oss_ir
@@ -109,7 +110,6 @@ class oss4SHIS:
 # Unit test of the above class
 #
 if ( __name__ == '__main__' ):
-  import numpy as np
   from netCDF4 import Dataset
   from emissivity import emissivity
 

@@ -21,20 +21,15 @@ Developed by: P. Anontelli, G. Giuliani, T. Cherubini
 
 Wed 11 dec 2013, 15.59.41, CET
   """
-  def __init__(self,datapath,osspath):
+  def __init__(self,datapath,oss):
     #
     # Surface Elevation
     #
     # self.surfaceElevation_km = 0.0145
     self.datapath = datapath
-    self.osspath = osspath
+    self.oss = oss
     self.surfacePressure_mb = 1013.0
     self.pressure_surf = self.surfacePressure_mb
-    #
-    # OSS init input
-    #
-    control.solar = 'solar_irradiances.nc'
-    control.precomputed = 'leo.cris.0.05.nc'
     #
     # Satellite/FOV properties
     #
@@ -174,8 +169,10 @@ Wed 11 dec 2013, 15.59.41, CET
 #
 if ( __name__ == '__main__' ):
   from netCDF4 import Dataset
-  cx = control('/home/graziano/Software/pythoncode/data',
-               '/home/graziano/Software/pythoncode/oss')
+  # Do not need oss to test configuration
+  datapath = '/home/graziano/Software/pythoncode/data'
+  oss = None
+  cx = control(datapath,oss)
   print(cx.pressure_grid)
   oe = obsErr(cx)
   ap = apriori(cx)

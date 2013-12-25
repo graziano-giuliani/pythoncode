@@ -5,7 +5,7 @@ import cProfile, pstats, io
 import mirto_code_configuration
 import sys
 
-def mirto_code_main(datapath,osspath,profiling=None):
+def mirto_code_main(datapath,oss,profiling=None):
   """solution = mirto_code_main
 
 This function is part of the Matlab implementation of the
@@ -31,7 +31,7 @@ Thu 12 dec 2013, 10.32.53, CET
       pr.enable()
 
   # Load configuration parameters and Input data for retrieval
-  control = mirto_code_configuration.control(datapath,osspath)
+  control = mirto_code_configuration.control(datapath,oss)
   obsErr = mirto_code_configuration.obsErr(control)
   apriori = mirto_code_configuration.apriori(control)
 
@@ -58,12 +58,10 @@ Thu 12 dec 2013, 10.32.53, CET
     #
     #
     # print('... Compute_F')
-
     fm.compute(xhat)
+    fm.estimate_K(xhat)
 
 # UP TO HERE
-
-    [fm, control] = mirto_code_oss_estimate_K(control, xhat, fm)
 
     residuals = mirto_code_compute_residuals(control,fm)
 
@@ -114,8 +112,8 @@ Thu 12 dec 2013, 10.32.53, CET
         xhat_pre[control.state_var_indx] = state.xhat
         xhat[control.state_var_indx] = state.xhat_new
 
-    solution = state
     Iteration = Iteration+1
+    return(state)
 
   if ( profiling is not None ):
     if ( profiling == True ):
@@ -127,5 +125,14 @@ Thu 12 dec 2013, 10.32.53, CET
       print(s.getvalue())
 
 if ( __name__ == '__main__' ):
-  solution = mirto_code_main('/home/graziano/Software/pythoncode/data',
-                             '/home/graziano/Software/pythoncode/oss')
+  sys.path.append('/home/graziano/Software/pythoncode/oss')
+  from oss4SHIS import oss4SHIS
+  from os import path
+  #
+  # OSS init input
+  #
+  solar = 'solar_irradiances.nc'
+  precomputed = 'leo.cris.0.05.nc'
+  datapath = '/home/graziano/Software/pythoncode/data'
+  oss = oss4SHIS(path.join(datapath,solar),path.join(datapath,precomputed))
+  solution = mirto_code_main('/home/graziano/Software/pythoncode/data',oss)
