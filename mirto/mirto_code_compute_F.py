@@ -124,19 +124,17 @@ Compute the jacobian K using the selected model
       vmr = 1.e6*np.exp(x[self.wvs:self.wve])
       # w = 1.e-6*(self.Mw/self.Md)*vmr 
       w = 1.e-6*vmr
-      w_mat = np.tile(w,(1,krow))
+      w_mat = np.tile(w,(krow,1))
       jcb = np.transpose(self.outdata['xkt'][self.wvs:self.wve,:])
       # Jacobians in log(q)
-      jac[:,self.wvs:self.wve] = (
-              np.fliplr(jcb)*np.reshape(w_mat.T,np.shape(jcb)) )
+      jac[:,self.wvs:self.wve] = np.fliplr(jcb)*w_mat
     if ( CO2flag > 0 ):
       # convert from log(vmr in ppv) to vmr in ppmv
       # vmr = x[self.cos:self.coe]
       # w = 1.e-6*(self.Mc/self.Md)*vmr
-      # w_mat = np.tile(w,(1,krow))
+      # w_mat = np.tile(w,(krow,1))
       jcb = np.transpose(self.outdata['xkt'][self.cos:self.coe,:])
-      # jac[:,self.cos:self.coe] = (
-      #       np.fliplr(jcb)*np.reshape(w_mat.T,np.shape(jcb)) )
+      # jac[:,self.cos:self.coe] = np.fliplr(jcb)*w_mat
       # Jacobians in ppmv
       jac[:,self.cos:self.coe] = np.fliplr(jcb)*(self.Mc/self.Md)*1.e-6
     if ( O3flag > 0 ):
@@ -144,22 +142,20 @@ Compute the jacobian K using the selected model
       vmr = np.exp(x[self.ozs:self.oze])
       # w = 1.e-6*(self.Mo/self.Md)*vmr
       w = vmr
-      w_mat = np.tile(w,(1,krow))
+      w_mat = np.tile(w,(krow,1))
       jcb = np.transpose(self.outdata['xkt'][self.ozs:self.oze,:])
       # jacobians in log(q)
-      jac[:,self.ozs:self.oze] = (
-             np.fliplr(jcb)*np.reshape(w_mat.T,np.shape(jcb)) )
+      jac[:,self.ozs:self.oze] = np.fliplr(jcb)*w_mat
     if ( SKTflag > 0 ):
       jcb = np.transpose(self.outdata['xkt'][self.sks:self.ske,:])
       jac[:,self.sks:self.ske] = jcb
     if ( SEflag > 0 ):
       # margin used in calculation about selwn
       calcmargin = 70
-      v1 = 645    # start wavenumber, cm^-1 from selwn input with margin
-      v2 = 2760   # end wavenumber,   cm^-1 from selwn input with margin
       # compute surface emissivity
       emiss = surface_emissivity(self.cx,x)
-      interp_EmissVal = np.interp(wvn,emis.wnSurfEmiss,emis.SurfEmiss_values)
+      interp_EmissVal = np.interp(wvn,
+            emis.wnSurfEmiss,emis.SurfEmiss_values,0.999,0.999)
       jcb = np.transpose(self.outdata['paxkemrf'][1,:])
       self.cx.Kse = jcb
       w = interp_EmissVal*(1.0-interp_EmissVal)
@@ -167,7 +163,7 @@ Compute the jacobian K using the selected model
       # Note: The jacobian we want is the lblrtm surface jacobian times each
       # SurfEmissModelFunctions interpolated to the calculation scale.
       interp_SurfEmissModelFunctions = np.interp(wvn,
-              emis.wnSurfEmissModelFunctions,emis.SurfEmissModelFunctions)
+            emis.wnSurfEmissModelFunctions,emis.SurfEmissModelFunctions,0.0,0.0)
       for i in range(self.ems,self.eme):
         jac[:,i] = interp_SurfEmissModelFunctions[:,i]*jcb*w
     self.K = jac
