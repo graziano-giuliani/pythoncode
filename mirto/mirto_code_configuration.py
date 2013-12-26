@@ -39,12 +39,7 @@ Wed 11 dec 2013, 15.59.41, CET
     #
     # Define other retrieval parameters
     #
-    self.MarLev = 1 # Boolean to use Marquart-Levemberg approach
-    self.gamma = 3  # Marquardt-Levemberg parameter
-    # Enter convergence test limit
-    # (dimensionless units related to signal-to-noise squared, e.g.
-    #   9 = 3 sigma)
-    self.chi_sq_limit = 1;
+    self.gamma = 3.0  # Marquardt-Levemberg parameter
     # Set a control flag(0=Use existing K or 1=Update K) for each desired
     # iteration (including the first)
     # Note: Updating the jacobian matrix K is very slow and may be unnecessary

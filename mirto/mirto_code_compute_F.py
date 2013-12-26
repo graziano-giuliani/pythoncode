@@ -4,9 +4,6 @@ import numpy as np
 import os
 import sys
 
-class residuals:
-  pass
-
 class radiance:
   """radiance class
 
@@ -43,6 +40,7 @@ Wed 11 dec 2013, 15.59.41, CET
     self.Mc = 44.01   # Molecular Mass of CO2
     self.Mo = 48      # Molecular Mass of Ozone
     self.tds = 0
+    self.nlev = self.xdim[0]
     self.tde = self.tds+self.xdim[0]
     self.wvs = self.tde
     self.wve = self.wvs+self.xdim[1]
@@ -97,6 +95,7 @@ Wed 11 dec 2013, 15.59.41, CET
     indata['sunang'] = self.cx.SunAngle
     self.oss.compute(indata,self.outdata)
     self.F = self.outdata['y']
+    self.wnF = self.oss.cwvn
 
   def estimate_K(self,x):
     from mirto_code_configuration import surface_emissivity
@@ -120,9 +119,10 @@ Compute the jacobian K using the selected model
     jac = np.zeros((krow,sum(xdim[0:6])))
     jac.fill(np.NAN)
     wvn = self.cx.wnR
+    nlev = self.nlev
 
     if ( Tflag ):
-      jcb = np.transpose(self.outdata['xkt'][self.tds:self.tde,:])
+      jcb = np.transpose(self.outdata['xkt'][0:nlev,:])
       jac[:,self.tds:self.tde] = np.fliplr(jcb)
     if ( WVflag ):
       #  convert from log(vmr in ppv) to vmr in ppmv
@@ -130,7 +130,7 @@ Compute the jacobian K using the selected model
       # w = 1.e-6*(self.Mw/self.Md)*vmr 
       w = 1.e-6*vmr
       w_mat = np.tile(w,(krow,1))
-      jcb = np.transpose(self.outdata['xkt'][self.wvs:self.wve,:])
+      jcb = np.transpose(self.outdata['xkt'][nlev+2:nlev+2+nlev,:])
       # Jacobians in log(q)
       jac[:,self.wvs:self.wve] = np.fliplr(jcb)*w_mat
     if ( CO2flag ):
@@ -138,7 +138,7 @@ Compute the jacobian K using the selected model
       # vmr = x[self.cos:self.coe]
       # w = 1.e-6*(self.Mc/self.Md)*vmr
       # w_mat = np.tile(w,(krow,1))
-      jcb = np.transpose(self.outdata['xkt'][self.cos:self.coe,:])
+      jcb = np.transpose(self.outdata['xkt'][2*nlev+2:2*nlev+2+nlev,:])
       # jac[:,self.cos:self.coe] = np.fliplr(jcb)*w_mat
       # Jacobians in ppmv
       jac[:,self.cos:self.coe] = np.fliplr(jcb)*(self.Mc/self.Md)*1.e-6
@@ -148,11 +148,11 @@ Compute the jacobian K using the selected model
       # w = 1.e-6*(self.Mo/self.Md)*vmr
       w = vmr
       w_mat = np.tile(w,(krow,1))
-      jcb = np.transpose(self.outdata['xkt'][self.ozs:self.oze,:])
+      jcb = np.transpose(self.outdata['xkt'][3*nlev+2:3*nlev+2+nlev,:])
       # jacobians in log(q)
       jac[:,self.ozs:self.oze] = np.fliplr(jcb)*w_mat
     if ( SKTflag ):
-      jcb = np.transpose(self.outdata['xkt'][self.sks:self.ske,:])
+      jcb = np.transpose(self.outdata['xkt'][nlev+1:nlev+2,:])
       jac[:,self.sks:self.ske] = jcb
     if ( SEflag ):
       # compute surface emissivity
@@ -162,7 +162,6 @@ Compute the jacobian K using the selected model
       jcb = np.transpose(self.outdata['paxkemrf'][0,:])
       self.cx.Kse = jcb
       w = interp_EmissVal*(1.0-interp_EmissVal)
-      self.cx.Kse_logit = jcb*w
       # Note: The jacobian we want is the lblrtm surface jacobian times each
       # SurfEmissModelFunctions interpolated to the calculation scale.
       for i in range(self.ems,self.eme):
@@ -173,7 +172,7 @@ Compute the jacobian K using the selected model
     self.K = jac
     self.wnK = wvn
 
-  def compute_residuals(self):
+  def compute_residuals(self,xres):
    """ 
 Compute the obs minus calc difference, yobs_minus_yhat
 
@@ -196,13 +195,9 @@ Output:
    wnF = self.wnF
 
    # Extract the selected channels for the retrieval
-   jj = self.cx.indx.astype(int)
-
-   xres = residuals()
+   jj = self.cx.indx
    xres.yobs_minus_yhat = Robs[jj] - F[jj]
    xres.wnyobs_minus_yhat = wnF[jj]
-
-   return(xres)
 
 #
 # Unit test of the above
@@ -233,5 +228,3 @@ if ( __name__ == '__main__' ):
   ncra[:] = rad.F
   rootgrp.close()
   rad.estimate_K(x)
-  res = rad.compute_residuals( )
-  print (res.yobs_minus_yhat)

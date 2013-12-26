@@ -11,47 +11,44 @@ import sys
 class mirto_state:
   pass
 
+class mirto_residuals:
+  pass
+
 class mirto_history:
   def __init__(self):
     self.measurement_space_only = []
-    self.d2 = []
 
 class mirto_norm:
   def __init__(self):
     self.measurement_space_only = np.NAN
-    self.solution_space_only = np.NAN
 
 class mirto:
   def __init__(self,datapath,oss):
     # Load configuration parameters and Input data for retrieval
-    self.control = mirto_code_configuration.control(datapath,oss)
-    self.obsErr = mirto_code_configuration.obsErr(self.control)
-    self.apriori = mirto_code_configuration.apriori(self.control)
+    self.cx = mirto_code_configuration.control(datapath,oss)
+    self.obsErr = mirto_code_configuration.obsErr(self.cx)
+    self.apriori = mirto_code_configuration.apriori(self.cx)
     self.state = mirto_state()
     self.norm = mirto_norm()
-    self.history = mirto_history()
+    self.hist = mirto_history()
+    self.residuals = mirto_residuals()
+    self.converge = 0.03 * len(self.cx.state_var_indx)
 
-  def compute_chi_square(self,residuals):
+  def compute_chi_square(self):
     self.norm.measurement_space_only = (
-      np.dot(
-             np.dot(residuals.yobs_minus_yhat.T,self.obsErr.SeInv),
-             residuals.yobs_minus_yhat/len(residuals.yobs_minus_yhat)) )
-    self.norm.solution_space_only = (
-      np.dot(
-             np.dot(self.state.xhat-self.state.xhat_pre.T,
-                    self.apriori.SaInv_ret),
-             self.state.xhat-self.state.xhat_pre/len(self.state.xhat) ) )
+      np.dot(np.dot(self.residuals.yobs_minus_yhat.T,self.obsErr.SeInv),
+          self.residuals.yobs_minus_yhat/len(self.residuals.yobs_minus_yhat)) )
 
-  def update_solution(self,fm,residuals):
-    self.control.KtSeInv = np.dot(fm.K.T,self.obsErr.SeInv)
-    self.control.KtSeInvK = np.dot(self.control.KtSeInv,fm.K)
-    A = (self.control.KtSeInvK+(1.0+self.control.gamma)*self.apriori.SaInv_ret)
+  def update_solution(self,fm):
+    KtSeInv = np.dot(fm.K.T,self.obsErr.SeInv)
+    KtSeInvK = np.dot(KtSeInv,fm.K)
+    A = (KtSeInvK+(1.0+self.cx.gamma)*self.state.SaInv_ret)
     dx = (self.state.xhat-self.state.xa)
-    d = (np.dot(self.control.KtSeInv,residuals.yobs_minus_yhat) - 
-         np.dot(self.apriori.SaInv_ret,dx))
+    d = (np.dot(KtSeInv,self.residuals.yobs_minus_yhat) - 
+         np.dot(self.state.SaInv_ret,dx))
     # Use iterative LU decomposition to determine the solution
     # First iteration
-    (P,L,U) = lu(A)
+    L,U = lu(A,permute_l=True)
     y = solve(L,d)
     x = solve(U,y)
     # Second iteration
@@ -59,10 +56,12 @@ class mirto:
     dz = solve(L,r)
     ddx = solve(U,dz)
     # Solution
-    self.state.xhat_new = x+ddx+self.state.xhat
-    self.state.d2 = np.dot(self.state.xhat_new-self.state.xhat.T,d)
+    totx = x+ddx
+    self.state.xhat_new = self.state.xhat+totx
+    self.state.d2 = np.dot(totx.T,d)
     
   def invert(self,profiling=None):
+
     if ( profiling is not None ):
       if ( profiling == True ):
         pr = cProfile.Profile()
@@ -73,85 +72,82 @@ class mirto:
 
     # Iteration of the Newton-Gauss method to find the zero of the first
     #   derivative of the Gaussian PDF
-    Iteration = 1
-
-    # Set initial values (very large) for d2
-    self.control.d2 = 10.0**6
+    Iteration = 0
 
     # Initialize state vector per previous iteration to apriori.xa
     #   (same as apriori.X0)
     xhat_pre = self.apriori.xa
 
-    fm = mirto_code_compute_F.radiance(self.control)
+    fm = mirto_code_compute_F.radiance(self.cx)
 
-    while (Iteration <= self.control.Iteration_limit):
+    jj = self.cx.state_var_indx
+    self.state.SaInv_ret = self.apriori.SaInv[jj,:]
+    self.state.SaInv_ret = self.state.SaInv_ret[:,jj]
+    self.state.xa = self.apriori.xa[jj]
+
+    while (Iteration < self.cx.Iteration_limit):
       #
       # Compute F (forward model)
       #
       # print('... Compute_F')
+
       fm.compute_forward(xhat)
       fm.estimate_K(xhat)
-      residuals = fm.compute_residuals( )
+
+      fm.compute_residuals(self.residuals)
 
       # Subselect from forward model output the channels used for the
       # inversion
-      fm.K = fm.K[:,self.control.state_var_indx]
-      fm.F = fm.F[self.control.indx]
-      fm.wnF = fm.wnF[self.control.indx]
-      fm.wnK = fm.wnK[self.control.indx]
+
+      ii = self.cx.indx
+      fm.K = fm.K[ii,:]
+      fm.F = fm.F[ii]
+      fm.wnF = fm.wnF[ii]
+      fm.wnK = fm.wnK[ii]
 
       # Subselect from forward model output (Jacobians) and from
       # whole apriori the variables actually retrieved.
-      fm.K = fm.K[self.control.indx,:]
-      self.apriori.Sa_ret = self.apriori.Sa[self.control.state_var_indx,
-                                            self.control.state_var_indx]
-      self.apriori.SaInv_ret = self.apriori.SaInv[self.control.state_var_indx,
-                                                  self.control.state_var_indx]
-      self.state.xhat = xhat[self.control.state_var_indx]
-      self.state.xhat_pre = xhat_pre[self.control.state_var_indx]
-      self.state.xa = self.apriori.xa[self.control.state_var_indx]
+      fm.K = fm.K[:,jj]
+      self.state.xhat = xhat[jj]
+      self.state.xhat_pre = xhat_pre[jj]
 
-      self.compute_chi_square(residuals)
+      self.compute_chi_square()
+      self.update_solution(fm)
 
-      self.update_solution(fm,residuals)
-
-      self.history.measurement_space_only.append(
-              self.norm.measurement_space_only)
-      self.history.d2.append(self.state.d2)
-
-      if (Iteration > 1):
-        ref_norm = min(self.history.measurement_space_only[:]);
-        if  (self.norm.measurement_space_only <= ref_norm):
-          print('Residual decreasing, solution saved')
-          self.control.gamma = self.control.gamma/2.0
+      if ( Iteration > 0 ):
+        ref_norm = min(self.hist.measurement_space_only)
+        print ('Actual value of Norm   : ',self.norm.measurement_space_only)
+        print ('Last low value of Norm : ',ref_norm)
+        if (self.norm.measurement_space_only <= ref_norm):
+          self.cx.gamma = self.cx.gamma/2.0
           xxdel = (100.0 * (ref_norm - self.norm.measurement_space_only) /
                             self.norm.measurement_space_only)
-          print('UWPHYSRET residuals decreased by ',xxdel)
+          print('UWPHYSRET residuals decreased by ',xxdel,'%')
         else:
-          self.control.gamma = self.control.gamma*5.0
+          self.cx.gamma = self.cx.gamma*5.0
           xxdel = (100.0 * (self.norm.measurement_space_only - ref_norm) /
                             self.norm.measurement_space_only)
-          print('UWPHYSRET residuals increased by ',xxdel)
-          print('Residual increasing, solution NOT saved')
-          his_d2 = min(abs(self.history.d2[:]))
+          print('UWPHYSRET residuals increased by ',xxdel,'%')
 
-      xhat[self.control.state_var_indx] = self.state.xhat
+      xhat[jj] = self.state.xhat
 
-      if (abs(self.state.d2) < 0.03 * len(self.control.state_var_indx)):
+      if (abs(self.state.d2) < self.converge):
         print('****  CONVERGED!!! ****')
         break
       else:
-        print('****  Convergence test failed.  ')
-        if (Iteration < self.control.Iteration_limit):
+        if (Iteration < self.cx.Iteration_limit):
           # assign new value to the solution and continue the iterative solution
           # Note: Don't update xhat if this is the final iteration or it
           # will overwrite the solution
-          print('... Update_xhat')
-          xhat_pre[self.control.state_var_indx] = self.state.xhat
-          xhat[self.control.state_var_indx] = self.state.xhat_new
-      Iteration = Iteration+1
+          xhat_pre[jj] = self.state.xhat
+          xhat[jj] = self.state.xhat_new
 
-    return(self.state)
+      self.hist.measurement_space_only.append(self.norm.measurement_space_only)
+      Iteration = Iteration + 1
+      print ('Iteration = ', Iteration)
+      print ('New Gamma = ', self.cx.gamma)
+      print ('Distance  = ', abs(self.state.d2))
+      print ('Wanted    = ', self.converge)
 
     if ( profiling is not None ):
       if ( profiling == True ):
@@ -161,6 +157,8 @@ class mirto:
         ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
         ps.print_stats()
         print(s.getvalue())
+
+    return(self.state)
 
 if ( __name__ == '__main__' ):
   sys.path.append('/home/graziano/Software/pythoncode/oss')
@@ -174,4 +172,14 @@ if ( __name__ == '__main__' ):
   datapath = '/home/graziano/Software/pythoncode/data'
   oss = oss4SHIS(path.join(datapath,solar),path.join(datapath,precomputed))
   inverter = mirto('/home/graziano/Software/pythoncode/data',oss)
-  solution = inverter.invert()
+  solution = inverter.invert(profiling=True)
+  print('Profiles')
+  print('Temperature   Water Vapor    O3')
+  for i in range(0,61):
+    print(solution.xhat[i],solution.xhat[i+61],
+          solution.xhat[i+122])
+  print('Skin temperature : ',solution.xhat[183])
+  print('Surface Emissivity : ')
+  for i in range(184,189):
+    print(solution.xhat[i])
+  print('Value of distance : ',solution.d2)
