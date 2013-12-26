@@ -1,19 +1,20 @@
 #!/usr/bin/env python
 # mirto_code_configuration.py
+"""
+This module is a temporary for a test configuration of the mirto code
+"""
 import numpy as np
 from netCDF4 import Dataset
 import os
 
-class control:
-  """mirto_code_configuration
+class mirto_config:
+  """mirto_config
 
 This function is part of the Python implementation of the MTG-IRS Real Time
 Operational code
 
 Defines input variable for test case for development of python version of
 UWPHYSRET. Test case selected for IASI radiance spectrum.
-
-Input: Structures prof, control
 
 Calling sequence:
 
@@ -40,10 +41,10 @@ Wed 11 dec 2013, 15.59.41, CET
     # Define other retrieval parameters
     #
     self.gamma = 3.0  # Marquardt-Levemberg parameter
-    # Set a control flag(0=Use existing K or 1=Update K) for each desired
+    # Set a config flag(0=Use existing K or 1=Update K) for each desired
     # iteration (including the first)
     # Note: Updating the jacobian matrix K is very slow and may be unnecessary
-    # Enter control flags for first retrieval,      e.g. [1 0 0 0 0 0]
+    # Enter config flags for first retrieval,      e.g. [1 0 0 0 0 0]
     self.EstimateK = np.array([1,1,1,1,1,1,1,1,1,1,1],dtype=int)
     # Enter Environmental Parameter to Retrieve (e.g. [-2 -1 0 1 2 3])
     self.Jvar = np.array([-2,-1,0,1,3],dtype=int)
@@ -83,29 +84,29 @@ Wed 11 dec 2013, 15.59.41, CET
     df.close()
     self.pressure_grid = self.p[0:self.xdim[0]]
 
-class obsErr:
-  def __init__(self,control):
-    df = Dataset(os.path.join(control.datapath,'obserr.nc'))
+class mirto_obsErr:
+  def __init__(self,config):
+    df = Dataset(os.path.join(config.datapath,'obserr.nc'))
     # Get obervation error covariance
     self.Se = np.array(df.variables['obserrselchannels'][:])
     self.SeInv = np.array(df.variables['invobserrselchannels'][:])
     df.close()
 
-class apriori:
-  def __init__(self,control):
-    df = Dataset(os.path.join(control.datapath,'fg.nc'))
+class mirto_apriori:
+  def __init__(self,config):
+    df = Dataset(os.path.join(config.datapath,'fg.nc'))
     # Get first guess
     self.x0 = np.array(df.variables['x0'][:])
     self.xa = np.array(df.variables['xa'][:])
     df.close()
-    df = Dataset(os.path.join(control.datapath,'apriori.nc'))
+    df = Dataset(os.path.join(config.datapath,'apriori.nc'))
     # Get a-priori covariance
     self.Sa = np.array(df.variables['Sa'][:])
     self.SaInv = np.array(df.variables['SaInv'][:])
     df.close()
 
 class surface_emissivity:
-  def __init__(self,control,x):
+  def __init__(self,config,x):
     """
 Compute a surface emissivity spectrum from a set of model coefficients and
 model functions
@@ -113,7 +114,7 @@ model functions
    out1 = computed emissivity values
    out2 = wavenumber scale of computed emissivity values
 
-   control is a data structure containing control variables
+   config is a data structure containing config variables
    SurfEmissCoefficients are the surface emissivity coefficients
        (vector)
    SurfEmissModelFunctions are the surface emissivity model functions
@@ -129,7 +130,7 @@ model functions
    OutputNumberPoints is the desired length of the output emissivity
        spectrum
 
-Note: 
+Note:
  The surface emissivity model functions are defined on their own
  wavenumber scale.
  This routine handles any interpolation or extrapolation to the requested
@@ -143,35 +144,34 @@ Developed by: P. Anontelli, G. Giuliani, T. Cherubini
 
 Wed 11 dec 2013, 15.59.41, CET
     """
-    x_dim = control.xdim
+    x_dim = config.xdim
     # load surface emissivity coefficients from solution vector
     SurfEmissCoefficients = (
           x[x_dim[0]+x_dim[1]+x_dim[2]+x_dim[3]+x_dim[4]:
             x_dim[0]+x_dim[1]+x_dim[2]+x_dim[3]+x_dim[4]+x_dim[5]] )
-    SurfEmissModel_values = ( np.dot(control.SurfEmissModelFunctions.T,
-      SurfEmissCoefficients) + control.SurfEmissModelFunctions_bias)
-    wnSurfEmiss = control.wnSurfEmissModelFunctions
+    SurfEmissModel_values = ( np.dot(config.SurfEmissModelFunctions.T,
+      SurfEmissCoefficients) + config.SurfEmissModelFunctions_bias)
+    wnSurfEmiss = config.wnSurfEmissModelFunctions
     self.SurfEmiss_values = SurfEmissModel_values
     self.wnSurfEmiss = wnSurfEmiss
     self.SurfEmiss_values = ((    np.exp(self.SurfEmiss_values))/
                              (1.0+np.exp(self.SurfEmiss_values)))
-    self.SurfEmissModelFunctions = control.SurfEmissModelFunctions
-    self.wnSurfEmissModelFunctions = control.wnSurfEmissModelFunctions
-    self.SurfEmissModelFunctions_bias = control.SurfEmissModelFunctions_bias
-    self.wnSurfEmissModelFunctions_bias = control.wnSurfEmissModelFunctions
+    self.SurfEmissModelFunctions = config.SurfEmissModelFunctions
+    self.wnSurfEmissModelFunctions = config.wnSurfEmissModelFunctions
+    self.SurfEmissModelFunctions_bias = config.SurfEmissModelFunctions_bias
+    self.wnSurfEmissModelFunctions_bias = config.wnSurfEmissModelFunctions
 
 #
 # Unit test of the above
 #
 if ( __name__ == '__main__' ):
-  from netCDF4 import Dataset
   # Do not need oss to test configuration
   datapath = '/home/graziano/Software/pythoncode/data'
   oss = None
-  cx = control(datapath,oss)
+  cx = mirto_config(datapath,oss)
   print(cx.pressure_grid)
-  oe = obsErr(cx)
-  ap = apriori(cx)
+  oe = mirto_obsErr(cx)
+  ap = mirto_apriori(cx)
   x = ap.x0
   emiss = surface_emissivity(cx,x)
   rootgrp = Dataset('emiss.nc', 'w', format='NETCDF4')

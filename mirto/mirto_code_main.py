@@ -2,7 +2,7 @@
 # mirto_code_main.py
 import numpy as np
 from scipy.linalg import lu , solve
-import cProfile, pstats, io
+import cProfile, pstats
 import mirto_code_configuration
 import mirto_code_compute_F
 import sys
@@ -25,9 +25,9 @@ class mirto_norm:
 class mirto:
   def __init__(self,datapath,oss):
     # Load configuration parameters and Input data for retrieval
-    self.cx = mirto_code_configuration.control(datapath,oss)
-    self.obsErr = mirto_code_configuration.obsErr(self.cx)
-    self.apriori = mirto_code_configuration.apriori(self.cx)
+    self.cx = mirto_code_configuration.mirto_config(datapath,oss)
+    self.obsErr = mirto_code_configuration.mirto_obsErr(self.cx)
+    self.apriori = mirto_code_configuration.mirto_apriori(self.cx)
     self.state = mirto_state()
     self.norm = mirto_norm()
     self.hist = mirto_history()
@@ -152,11 +152,21 @@ class mirto:
     if ( profiling is not None ):
       if ( profiling == True ):
         pr.disable()
-        s = io.StringIO()
-        sortby = 'cumulative'
-        ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
-        ps.print_stats()
-        print(s.getvalue())
+        s = ()
+        try:
+          # Default to Python 3
+          import io
+          s = io.StringIO()
+          ps = pstats.Stats(pr, stream=s)
+          ps.strip_dirs().sort_stats('cumulative').print_stats()
+          print(s.getvalue())
+        except:
+          # May be this is Python 2?
+          import StringIO
+          s = StringIO.StringIO()
+          ps = pstats.Stats(pr, stream=s)
+          ps.strip_dirs().sort_stats('cumulative').print_stats()
+          print(s.getvalue())
 
     return(self.state)
 
@@ -171,15 +181,42 @@ if ( __name__ == '__main__' ):
   precomputed = 'leo.cris.0.05.nc'
   datapath = '/home/graziano/Software/pythoncode/data'
   oss = oss4SHIS(path.join(datapath,solar),path.join(datapath,precomputed))
+
+  # This part of code must be repeated for each input profile in data
+  # directory. Must find a way to have names here. Probably the errors
+  # also can be preloaded.
+  profiling = False
+  check_output = True
   inverter = mirto('/home/graziano/Software/pythoncode/data',oss)
-  solution = inverter.invert(profiling=True)
-  print('Profiles')
-  print('Temperature   Water Vapor    O3')
-  for i in range(0,61):
-    print(solution.xhat[i],solution.xhat[i+61],
-          solution.xhat[i+122])
-  print('Skin temperature : ',solution.xhat[183])
-  print('Surface Emissivity : ')
-  for i in range(184,189):
-    print(solution.xhat[i])
-  print('Value of distance : ',solution.d2)
+  solution = inverter.invert(profiling)
+
+  if ( check_output ):
+    print('Profiles')
+    print('Pressure         Temperature             Water Vapor         O3')
+    for i in range(0,61):
+      print(inverter.cx.pressure_grid[i],solution.xhat[i],
+            solution.xhat[i+61],solution.xhat[i+122])
+    print('Skin temperature : ',solution.xhat[183])
+    print('Surface Emissivity : ')
+    for i in range(184,189):
+      print(solution.xhat[i])
+    print('Value of distance : ',solution.d2)
+    try:
+      import pylab as p
+    except:
+      print('Cannot use pylab. Is it installed?')
+      sys.exit()
+    x = solution.xhat[0:61]
+    y = np.log(inverter.cx.pressure_grid[0:61])
+    p.ylabel("Log Pressure")
+    p.xlabel("Temperature")
+    p.plot(x,y)
+    p.plt.gca().invert_yaxis()
+    p.show()
+    p.ylabel("Pressure")
+    p.xlabel("Mixing Ratio")
+    x = np.exp(solution.xhat[61:122])
+    y = inverter.cx.pressure_grid[0:61]
+    p.plot(x,y)
+    p.plt.gca().invert_yaxis()
+    p.show()
