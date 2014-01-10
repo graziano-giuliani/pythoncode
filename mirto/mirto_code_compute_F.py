@@ -152,7 +152,7 @@ Compute the jacobian K using the selected model
       # jacobians in log(q)
       jac[:,self.ozs:self.oze] = np.fliplr(jcb)*w_mat
     if ( SKTflag ):
-      jcb = np.transpose(self.outdata['xkt'][nlev+1:nlev+2,:])
+      jcb = np.transpose(self.outdata['xkt'][nlev:nlev+1,:])
       jac[:,self.sks:self.ske] = jcb
     if ( SEflag ):
       # compute surface emissivity
