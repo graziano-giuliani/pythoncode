@@ -174,6 +174,7 @@ if ( __name__ == '__main__' ):
   sys.path.append('/home/graziano/Software/pythoncode/oss')
   from oss4SHIS import oss4SHIS
   from os import path
+  import time
   #
   # OSS init input
   #
@@ -185,10 +186,12 @@ if ( __name__ == '__main__' ):
   # This part of code must be repeated for each input profile in data
   # directory. Must find a way to have names here. Probably the errors
   # also can be preloaded.
+  start = time.clock()
   profiling = False
-  check_output = True
+  check_output = False
   inverter = mirto('/home/graziano/Software/pythoncode/data',oss)
   solution = inverter.invert(profiling)
+  print('Elapsed Time in the Inversion: ',time.clock() - start,' s')
 
   if ( check_output ):
     print('Profiles')
@@ -220,3 +223,4 @@ if ( __name__ == '__main__' ):
     p.plot(x,y)
     p.plt.gca().invert_yaxis()
     p.show()
+
