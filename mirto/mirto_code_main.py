@@ -6,6 +6,7 @@ import cProfile, pstats
 import mirto_code_configuration
 import mirto_code_compute_F
 import sys
+import ctypes
 
 # Empty class to store result
 class mirto_state:
@@ -40,7 +41,26 @@ class mirto:
           self.residuals.yobs_minus_yhat/len(self.residuals.yobs_minus_yhat)) )
 
   def update_solution(self,fm):
-    KtSeInv = np.dot(fm.K.T,self.obsErr.SeInv)
+    use_mkl = True
+    psize = np.shape(fm.K.T)
+    if ( use_mkl ):
+      mkl = ctypes.cdll.LoadLibrary('./libmkl_rt.so')
+      cblas_dgemm = mkl.cblas_dgemm
+      CblasRowMajor = ctypes.c_int(101)
+      CblasNoTrans = ctypes.c_int(111)
+      c_double_p = ctypes.POINTER(ctypes.c_double)
+      KtSeInv = np.zeros(shape=(psize[0],psize[1]))
+      cblas_dgemm(CblasRowMajor,CblasNoTrans,CblasNoTrans,
+                  ctypes.c_int(psize[0]),ctypes.c_int(psize[1]),
+                  ctypes.c_int(psize[1]),ctypes.c_double(1.0),
+                  fm.K.T.ctypes.data_as(c_double_p),
+                  ctypes.c_int(psize[1]),
+                  self.obsErr.SeInv.ctypes.data_as(c_double_p),
+                  ctypes.c_int(psize[1]), ctypes.c_double(0.0),
+                  KtSeInv.ctypes.data_as(c_double_p),
+                  ctypes.c_int(psize[1]))
+    else:
+      KtSeInv = np.dot(fm.K.T,self.obsErr.SeInv)
     KtSeInvK = np.dot(KtSeInv,fm.K)
     A = (KtSeInvK+(1.0+self.cx.gamma)*self.state.SaInv_ret)
     dx = (self.state.xhat-self.state.xa)
@@ -171,7 +191,7 @@ class mirto:
     return(self.state)
 
 if ( __name__ == '__main__' ):
-  sys.path.append('/home/graziano/Software/pythoncode/oss')
+  sys.path.append('/home/ggiuliani/pythoncode/oss')
   from oss4SHIS import oss4SHIS
   from os import path
   import time
@@ -180,16 +200,16 @@ if ( __name__ == '__main__' ):
   #
   solar = 'solar_irradiances.nc'
   precomputed = 'leo.cris.0.05.nc'
-  datapath = '/home/graziano/Software/pythoncode/data'
+  datapath = '/home/ggiuliani/pythoncode/data'
   oss = oss4SHIS(path.join(datapath,solar),path.join(datapath,precomputed))
 
   # This part of code must be repeated for each input profile in data
   # directory. Must find a way to have names here. Probably the errors
   # also can be preloaded.
   start = time.clock()
-  profiling = False
+  profiling = True
   check_output = False
-  inverter = mirto('/home/graziano/Software/pythoncode/data',oss)
+  inverter = mirto(datapath,oss)
   solution = inverter.invert(profiling)
   print('Elapsed Time in the Inversion: ',time.clock() - start,' s')
 
