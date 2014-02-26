@@ -5,6 +5,7 @@ module mod_1DVar
   private
 
   public :: init_1DVar
+  public :: compute_chi_square
   public :: update_solution_1DVar
 
   real , allocatable , dimension(:,:) :: fmKT
@@ -17,6 +18,8 @@ module mod_1DVar
   real , allocatable , dimension(:) :: dot1
   real , allocatable , dimension(:) :: dot2
   real , allocatable , dimension(:) :: dot3
+  real , allocatable , dimension(:) :: dot4
+  real , allocatable , dimension(:) :: dot5
   real , allocatable , dimension(:) :: d
   real , allocatable , dimension(:) :: x
   real , allocatable , dimension(:) :: y
@@ -39,6 +42,7 @@ module mod_1DVar
   interface dotprod
     module procedure dotprod_matrix_matrix
     module procedure dotprod_matrix_array
+    module procedure dotprod_array_matrix
     module procedure dotprod_array_array
   end interface
 
@@ -159,6 +163,45 @@ module mod_1DVar
       call sgemv('N',dim1,dim2,alpha,a,dim1,b,1,beta,c,1)
     end subroutine dotprod_matrix_array
 
+    subroutine dotprod_array_matrix(a,b,c)
+      implicit none
+      real , dimension(:) , intent(in) :: a
+      real , dimension(:,:) , intent(in) :: b
+      real , dimension(:) , intent(out) :: c
+      real , dimension(1,size(a)) :: tmp
+      real , dimension(1,size(b,2)) :: tmp1
+      integer :: dim1 , dim2 , dim3
+      real , parameter :: alpha = 1.0
+      real , parameter :: beta = 0.0
+      tmp(1,:) = a
+      dim1 = size(tmp,1)
+      dim2 = size(tmp,2)
+      dim3 = size(b,2)
+      if ( dim1 /= size(tmp1,1) ) then
+        write(0,*) 'Dimension error in DOTPROD : A(dim1) /= C(dim1)'
+        write(0,*) 'SHAPE A : ', shape(tmp)
+        write(0,*) 'SHAPE B : ', shape(b)
+        write(0,*) 'SHAPE C : ', shape(tmp1)
+        stop
+      end if
+      if ( dim2 /= size(b,1) ) then
+        write(0,*) 'Dimension error in DOTPROD : A(dim2) /= B(dim1)'
+        write(0,*) 'SHAPE A : ', shape(tmp)
+        write(0,*) 'SHAPE B : ', shape(b)
+        write(0,*) 'SHAPE C : ', shape(tmp1)
+        stop
+      end if
+      if ( dim3 /= size(tmp1,2) ) then
+        write(0,*) 'Dimension error in DOTPROD : B(dim2) /= C(dim(2)'
+        write(0,*) 'SHAPE A : ', shape(tmp)
+        write(0,*) 'SHAPE B : ', shape(b)
+        write(0,*) 'SHAPE C : ', shape(tmp1)
+        stop
+      end if
+      call sgemm('N','N',dim1,dim3,dim2,alpha,tmp,dim1,b,dim2,beta,tmp1,dim1)
+      c = tmp1(:,1)
+    end subroutine dotprod_array_matrix
+
     subroutine dotprod_array_array(a,b,d)
       implicit none
       real , intent(in) , dimension(:) :: a , b
@@ -258,6 +301,8 @@ module mod_1DVar
           deallocate(dot1)
           deallocate(dot2)
           deallocate(dot3)
+          deallocate(dot4)
+          deallocate(dot5)
         else
           return
         end if
@@ -281,6 +326,8 @@ module mod_1DVar
       allocate(dz(n))
       allocate(ddx(n))
       allocate(totx(n))
+      allocate(dot4(m))
+      allocate(dot5(m))
       do j = 1 , n
         do i = 1 , n
           utmask(i,j) = (j-i) > 0
@@ -295,6 +342,17 @@ module mod_1DVar
       call init_1DVar_2arg(sh(1),sh(2))
     end subroutine init_1DVar_arr
 
+    real function compute_chi_square(m,SEInv,yobs_minus_yhat) result(norm)
+      implicit none
+      integer , intent(in) :: m
+      real , dimension(m,m) , intent(in) :: SEInv
+      real , dimension(m) , intent(in) :: yobs_minus_yhat
+      if ( .not. isinit ) return
+      call dotprod(yobs_minus_yhat,SEInv,dot4)
+      dot5 = yobs_minus_yhat/size(yobs_minus_yhat)
+      call dotprod(dot4,dot5,norm)
+    end function compute_chi_square
+
     subroutine update_solution_1DVar(m,n,fmK,SEInv,SaInv_ret, &
                                      yobs_minus_yhat,xhat,ap,xhat_new,d2)
       implicit none
@@ -307,7 +365,7 @@ module mod_1DVar
       real , dimension(n) , intent(in) :: ap
       real , dimension(n) , intent(out) :: xhat_new
       real , intent(out) :: d2
-      call init_1DVar_arr(shape(fmK))
+      if ( .not. isinit ) return
       fmKT = transpose(fmK)
       call dotprod(fmKT,SEInv,KtSeInv)
       call dotprod(KtSeInv,fmK,KtSeInvK)
@@ -326,7 +384,6 @@ module mod_1DVar
       totx = x+ddx
       xhat_new = xhat+totx
       call dotprod(totx,d,d2)
-
     end subroutine update_solution_1DVar
 
 end module mod_1DVar
