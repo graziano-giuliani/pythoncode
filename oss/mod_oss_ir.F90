@@ -24,6 +24,7 @@ module mod_oss_ir
   use mpi
   use mod_solar
   use mod_hitran
+  use mod_forward_model_data
   use iso_fortran_env
 
   implicit none
@@ -63,6 +64,7 @@ module mod_oss_ir
     logical :: isinit = .false.
     contains
       procedure , pass :: init
+      procedure , pass :: forward_model
       procedure , pass :: delete
   end type aoss_ir
 
@@ -124,6 +126,13 @@ module mod_oss_ir
       iret = 0
     end function init
 
+    subroutine forward_model(this,indata,outdata)
+      implicit none
+      class(aoss_ir) :: this
+      type(atmospheric_data) , intent(in) :: indata
+      type(synthetic_measure) , intent(out) :: outdata
+    end subroutine forward_model
+
     integer function delete(this) result(iret)
       implicit none
       class(aoss_ir) :: this
@@ -151,6 +160,8 @@ end module mod_oss_ir
 
 #ifdef TESTME
 
+! mpif90 -O3 -g -mtune=native -c -I`nf-config --includedir` \
+!         mod_forward_model_data.F90
 ! mpif90 -O3 -g -mtune=native -c -I`nf-config --includedir` mod_solar.F90
 ! mpif90 -O3 -g -mtune=native -c -I`nf-config --includedir` mod_hitran.F90
 ! mpif90 -DTESTME -O3 -g -mtune=native -o test_oss_ir \
