@@ -19,7 +19,7 @@
 ! OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 ! SOFTWARE.
 !
-module mod_solar
+module mod_emissivity
 
   use netcdf
   use mpi
@@ -31,34 +31,30 @@ module mod_solar
 
   integer , parameter :: namelen = 16
 
-  type asolar
+  type aemissivity
     integer :: nf
-    real , dimension(:) , allocatable :: frq
-    real , dimension(:) , allocatable :: irr
-    real , dimension(:) , allocatable :: ivals
-    real :: f1
-    real :: df
+    real , dimension(:) , allocatable :: sfgrd
+    real , dimension(:) , allocatable :: emrf
     logical :: isinit = .false.
     contains
       procedure , pass :: init_file
       procedure , pass :: init_file_mpi
       procedure , pass :: init_data
-      procedure , pass :: interpolate
       procedure , pass :: delete
       ! final :: cleanup
-  end type asolar
+  end type aemissivity
 
-  public :: asolar
+  public :: aemissivity
 
   character(len=namelen) , parameter :: fdim = 'nspectral'
-  character(len=namelen) , parameter :: frq = 'FREQ'
-  character(len=namelen) , parameter :: irr = 'IRRADIANCE'
+  character(len=namelen) , parameter :: sfgrd = 'SfGrd'
+  character(len=namelen) , parameter :: emrf = 'EmRf'
 
   contains
 
     integer function init_file(this,datafile) result(iret)
       implicit none
-      class(asolar) :: this
+      class(aemissivity) :: this
       character(len=*) , intent(in) :: datafile
       integer :: ncid , dimid , varid , itmp
 
@@ -89,44 +85,44 @@ module mod_solar
         return
       end if
 
-      allocate(this%frq(this%nf), &
-               this%irr(this%nf), stat=iret)
+      allocate(this%sfgrd(this%nf), &
+               this%emrf(this%nf), stat=iret)
       if ( iret /= 0 ) then
         this%nf = 0
         write(error_unit,*) 'Memory error allocating'
         return
       end if
 
-      iret = nf90_inq_varid(ncid,frq,varid)
+      iret = nf90_inq_varid(ncid,sfgrd,varid)
       if ( iret /= nf90_noerr ) then
-        write(error_unit,*) 'No variable ',trim(frq), &
+        write(error_unit,*) 'No variable ',trim(sfgrd), &
              ' in file ', trim(datafile)
         write(error_unit,*) nf90_strerror(iret)
         itmp = this%delete()
         return
       end if
 
-      iret = nf90_get_var(ncid,varid,this%frq)
+      iret = nf90_get_var(ncid,varid,this%sfgrd)
       if ( iret /= nf90_noerr ) then
-        write(error_unit,*) 'Cannot read variable ',trim(frq), &
+        write(error_unit,*) 'Cannot read variable ',trim(sfgrd), &
              ' from file ', trim(datafile)
         write(error_unit,*) nf90_strerror(iret)
         itmp = this%delete()
         return
       end if
 
-      iret = nf90_inq_varid(ncid,irr,varid)
+      iret = nf90_inq_varid(ncid,emrf,varid)
       if ( iret /= nf90_noerr ) then
-        write(error_unit,*) 'No variable ',trim(irr), &
+        write(error_unit,*) 'No variable ',trim(emrf), &
              ' in file ', trim(datafile)
         write(error_unit,*) nf90_strerror(iret)
         itmp = this%delete()
         return
       end if
 
-      iret = nf90_get_var(ncid,varid,this%irr)
+      iret = nf90_get_var(ncid,varid,this%emrf)
       if ( iret /= nf90_noerr ) then
-        write(error_unit,*) 'Cannot read variable ',trim(irr), &
+        write(error_unit,*) 'Cannot read variable ',trim(emrf), &
              ' from file ', trim(datafile)
         write(error_unit,*) nf90_strerror(iret)
         itmp = this%delete()
@@ -141,47 +137,43 @@ module mod_solar
         return
       end if
 
-      this%f1 = this%frq(1)
-      this%df = this%frq(2) - this%frq(1)
       this%isinit = .true.
       iret = 0
     end function init_file
 
-    integer function init_data(this,frq,irr) result(iret)
+    integer function init_data(this,sfgrd,emrf) result(iret)
       implicit none
-      class(asolar) :: this
-      real , dimension(:) , intent(in) :: frq
-      real , dimension(:) , intent(in) :: irr
+      class(aemissivity) :: this
+      real , dimension(:) , intent(in) :: sfgrd
+      real , dimension(:) , intent(in) :: emrf
 
       if ( this%isinit ) then
         iret = this%delete()
       end if
 
-      if ( size(frq) /= size(irr) ) then
+      if ( size(sfgrd) /= size(emrf) ) then
         write(error_unit,*) 'Dimension mismatch'
         iret = -1
         return
       end if
 
-      this%nf = size(frq)
-      allocate(this%frq(this%nf), this%irr(this%nf), stat=iret)
+      this%nf = size(sfgrd)
+      allocate(this%sfgrd(this%nf), this%emrf(this%nf), stat=iret)
       if ( iret /= 0 ) then
         this%nf = 0
         write(error_unit,*) 'Memory error allocating'
         return
       end if
 
-      this%frq = frq
-      this%irr = irr
-      this%f1 = this%frq(1)
-      this%df = this%frq(2) - this%frq(1)
+      this%sfgrd = sfgrd
+      this%emrf = emrf
       this%isinit = .true.
       iret = 0
     end function init_data
 
     integer function init_file_mpi(this,datafile,iocpu,icomm) result(iret)
       implicit none
-      class(asolar) :: this
+      class(aemissivity) :: this
       character(len=*) , intent(in) :: datafile
       integer , intent(in) :: iocpu , icomm
       integer :: irank , mpierr
@@ -216,7 +208,7 @@ module mod_solar
       end if
 
       if ( irank /= iocpu ) then
-        allocate(this%frq(this%nf), this%irr(this%nf), stat=iret)
+        allocate(this%sfgrd(this%nf), this%emrf(this%nf), stat=iret)
         if ( iret /= 0 ) then
           write(error_unit,*) 'Allocation error on CPU ',irank
           call mpi_abort(icomm,-1,iret)
@@ -227,73 +219,32 @@ module mod_solar
         end if
       end if
 
-      call mpi_bcast(this%frq,this%nf,mpi_real,iocpu,icomm,mpierr)
+      call mpi_bcast(this%sfgrd,this%nf,mpi_real,iocpu,icomm,mpierr)
       if ( mpierr /= 0 ) then
         iret = this%delete( )
         iret = mpierr
       end if
 
-      call mpi_bcast(this%irr,this%nf,mpi_real,iocpu,icomm,mpierr)
+      call mpi_bcast(this%emrf,this%nf,mpi_real,iocpu,icomm,mpierr)
       if ( mpierr /= 0 ) then
         iret = this%delete( )
         iret = mpierr
       end if
 
       if ( irank /= iocpu ) then
-        this%f1 = this%frq(1)
-        this%df = this%frq(2) - this%frq(1)
         this%isinit = .true.
       end if
 
       iret = 0
     end function init_file_mpi
 
-    integer function interpolate(this,f) result(iret)
-      implicit none
-      class(asolar) :: this
-      real , dimension(:) , intent(in) :: f
-      real :: xf , w1 , w2
-      integer :: i , i1 , i2 , nif
-
-      if ( .not. this%isinit ) then
-        write(error_unit,*) 'Object not initialized'
-        iret = -1
-        return
-      end if
-
-      nif = size(f)
-      if ( allocated(this%ivals) ) then
-        if ( size(this%ivals) /= nif ) then
-          deallocate(this%ivals)
-          allocate(this%ivals(nif))
-        end if
-      else
-        allocate(this%ivals(nif))
-      end if
-      do i = 1 , nif
-        xf = (f(i)-this%f1)/this%df
-        i1 = floor(xf)
-        i2 = i1 + 1
-        i1 = max(1,min(this%nf,i1))
-        i2 = max(1,min(this%nf,i2))
-        w1 = xf-real(i1)
-        w2 = real(i2)-xf
-        this%ivals(i) = this%irr(i1) * w2 + this%irr(i2) * w1
-      end do
-    end function interpolate
-
     integer function delete(this) result(iret)
       implicit none
-      class(asolar) :: this
-      if ( allocated(this%irr) ) then
-        deallocate(this%frq)
-        deallocate(this%irr)
-        if ( allocated(this%ivals) ) then
-          deallocate(this%ivals)
-        end if
+      class(aemissivity) :: this
+      if ( allocated(this%emrf) ) then
+        deallocate(this%sfgrd)
+        deallocate(this%emrf)
         this%nf = -1
-        this%f1 = huge(this%f1)
-        this%df = huge(this%df)
       end if
       this%isinit = .false.
       iret = 0
@@ -301,31 +252,28 @@ module mod_solar
 
     subroutine cleanup(as)
       implicit none
-      type(asolar) :: as
-      if ( allocated(as%irr) ) then
-        deallocate(as%frq)
-        deallocate(as%irr)
-        if ( allocated(as%ivals) ) then
-          deallocate(as%ivals)
-        end if
+      type(aemissivity) :: as
+      if ( allocated(as%emrf) ) then
+        deallocate(as%sfgrd)
+        deallocate(as%emrf)
       end if
     end subroutine cleanup
 
-end module mod_solar
+end module mod_emissivity
 
 #ifdef TESTME
 
-! mpif90 -DTESTME -O3 -g -mtune=native -o test_solar \
-!        -I`nf-config --includedir` mod_solar.F90 `nf-config --flibs`
+! mpif90 -DTESTME -O3 -g -mtune=native -o test_emissivity \
+!        -I`nf-config --includedir` mod_emissivity.F90 `nf-config --flibs`
 
-program test_solar
-  use mod_solar
+program test_emissivity
+  use mod_emissivity
   use mpi
   implicit none
 
   integer :: i , j , ni , icomm , myid , nproc
   real , dimension(1550) :: f
-  type(asolar) :: as
+  type(aemissivity) :: as
 
   call mpi_init(i)
   if ( i /= 0 ) then
@@ -338,25 +286,18 @@ program test_solar
   call mpi_comm_size(icomm,nproc,i)
 
   if ( myid == 0 ) then
-    i = as%init_file('../data/solar_irradiances.nc')
-    do ni = 0 , 999
-      do j = 1 , 1550
-        f(j) = 1550.0+ni + real(j-1)/(1550.0/1000.0)
-      end do
-      i = as%interpolate(f)
-      print *, f(1) , f(1550)
-      print *, as%ivals(1) , as%ivals(1550)
-    end do
+    i = as%init_file('../data/emissivity.nc')
+    print *, as%emrf(as%nf/2)
     i = as%delete()
   end if
 
-  i = as%init_file_mpi('../data/solar_irradiances.nc',0,icomm)
+  i = as%init_file_mpi('../data/emissivity.nc',0,icomm)
 
-  print *, 'MYID : ', myid , ', NF = ',as%nf , 'IRR = ',as%irr(as%nf/2)
+  print *, 'MYID : ', myid , ', NF = ',as%nf , 'EMSF = ',as%emrf(as%nf/2)
 
   i = as%delete()
 
   call mpi_finalize(i)
 
-end program test_solar
+end program test_emissivity
 #endif
