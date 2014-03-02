@@ -291,6 +291,7 @@ module mod_solar
         w2 = real(i2)-xf
         this%ivals(i) = this%irr(i1) * w2 + this%irr(i2) * w1
       end do
+      iret = 0
     end function interpolate
 
     integer function delete(this) result(iret)
