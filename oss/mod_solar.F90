@@ -68,23 +68,24 @@ module mod_solar
 
       iret = nf90_open(datafile,nf90_nowrite,ncid)
       if ( iret /= nf90_noerr ) then
-        write(error_unit,*) 'Cannot open file ',trim(datafile)
+        write(error_unit,*) 'In file ',__FILE__,' at line ',__LINE__, &
+          ' : Cannot open file ',trim(datafile)
         write(error_unit,*) nf90_strerror(iret)
         return
       end if
 
       iret = nf90_inq_dimid(ncid,fdim,dimid)
       if ( iret /= nf90_noerr ) then
-        write(error_unit,*) 'No dimension ',trim(fdim),' in file ', &
-             trim(datafile)
+        write(error_unit,*) 'In file ',__FILE__,' at line ',__LINE__, &
+          ' : No dimension ',trim(fdim),' in file ', trim(datafile)
         write(error_unit,*) nf90_strerror(iret)
         return
       end if
 
       iret = nf90_inquire_dimension(ncid,dimid,len=this%nf)
       if ( iret /= nf90_noerr ) then
-        write(error_unit,*) 'Cannot read dimension ',trim(fdim), &
-             ' from file ', trim(datafile)
+        write(error_unit,*) 'In file ',__FILE__,' at line ',__LINE__, &
+          ' : Cannot read dimension ',trim(fdim),' from file ', trim(datafile)
         write(error_unit,*) nf90_strerror(iret)
         return
       end if
@@ -93,14 +94,15 @@ module mod_solar
                this%irr(this%nf), stat=iret)
       if ( iret /= 0 ) then
         this%nf = 0
-        write(error_unit,*) 'Memory error allocating'
+        write(error_unit,*) 'In file ',__FILE__,' at line ',__LINE__, &
+          ' : Memory error allocating'
         return
       end if
 
       iret = nf90_inq_varid(ncid,frq,varid)
       if ( iret /= nf90_noerr ) then
-        write(error_unit,*) 'No variable ',trim(frq), &
-             ' in file ', trim(datafile)
+        write(error_unit,*) 'In file ',__FILE__,' at line ',__LINE__, &
+          ' : No variable ',trim(frq), ' in file ', trim(datafile)
         write(error_unit,*) nf90_strerror(iret)
         itmp = this%delete()
         return
@@ -108,8 +110,8 @@ module mod_solar
 
       iret = nf90_get_var(ncid,varid,this%frq)
       if ( iret /= nf90_noerr ) then
-        write(error_unit,*) 'Cannot read variable ',trim(frq), &
-             ' from file ', trim(datafile)
+        write(error_unit,*) 'In file ',__FILE__,' at line ',__LINE__, &
+          ' : Cannot read variable ',trim(frq),' from file ', trim(datafile)
         write(error_unit,*) nf90_strerror(iret)
         itmp = this%delete()
         return
@@ -117,8 +119,8 @@ module mod_solar
 
       iret = nf90_inq_varid(ncid,irr,varid)
       if ( iret /= nf90_noerr ) then
-        write(error_unit,*) 'No variable ',trim(irr), &
-             ' in file ', trim(datafile)
+        write(error_unit,*) 'In file ',__FILE__,' at line ',__LINE__, &
+          ' : No variable ',trim(irr), ' in file ', trim(datafile)
         write(error_unit,*) nf90_strerror(iret)
         itmp = this%delete()
         return
@@ -126,8 +128,8 @@ module mod_solar
 
       iret = nf90_get_var(ncid,varid,this%irr)
       if ( iret /= nf90_noerr ) then
-        write(error_unit,*) 'Cannot read variable ',trim(irr), &
-             ' from file ', trim(datafile)
+        write(error_unit,*) 'In file ',__FILE__,' at line ',__LINE__, &
+          ' : Cannot read variable ',trim(irr),' from file ', trim(datafile)
         write(error_unit,*) nf90_strerror(iret)
         itmp = this%delete()
         return
@@ -135,7 +137,8 @@ module mod_solar
 
       iret = nf90_close(ncid)
       if ( iret /= nf90_noerr ) then
-        write(error_unit,*) 'Cannot close file ', trim(datafile)
+        write(error_unit,*) 'In file ',__FILE__,' at line ',__LINE__, &
+         ' : Cannot close file ', trim(datafile)
         write(error_unit,*) nf90_strerror(iret)
         itmp = this%delete()
         return
@@ -158,7 +161,8 @@ module mod_solar
       end if
 
       if ( size(frq) /= size(irr) ) then
-        write(error_unit,*) 'Dimension mismatch'
+        write(error_unit,*) 'In file ',__FILE__,' at line ',__LINE__, &
+          ' : Dimension mismatch'
         iret = -1
         return
       end if
@@ -167,7 +171,8 @@ module mod_solar
       allocate(this%frq(this%nf), this%irr(this%nf), stat=iret)
       if ( iret /= 0 ) then
         this%nf = 0
-        write(error_unit,*) 'Memory error allocating'
+        write(error_unit,*) 'In file ',__FILE__,' at line ',__LINE__, &
+          ' : Memory error allocating'
         return
       end if
 
@@ -192,17 +197,20 @@ module mod_solar
 
       call mpi_comm_rank(icomm,irank,iret)
       if ( iret /= 0 ) then
-        write(error_unit,*) 'Error in MPI_COMM_RANK'
+        write(error_unit,*) 'In file ',__FILE__,' at line ',__LINE__, &
+          ' : Error in MPI_COMM_RANK'
         return
       end if
 
       if ( irank == iocpu ) then
         iret = init_file(this,datafile)
         if ( iret /= 0 ) then
-          write(error_unit,*) 'IOCPU is not able to initialize'
+          write(error_unit,*) 'In file ',__FILE__,' at line ',__LINE__, &
+            ' : IOCPU is not able to initialize'
           call mpi_abort(icomm,-1,iret)
           if ( iret /= 0 ) then
-            write(error_unit,*) 'THIS MUST NEVER HAPPEN !'
+            write(error_unit,*) 'In file ',__FILE__,' at line ',__LINE__, &
+              ' : THIS MUST NEVER HAPPEN !'
             call abort
           end if
         end if
@@ -218,10 +226,12 @@ module mod_solar
       if ( irank /= iocpu ) then
         allocate(this%frq(this%nf), this%irr(this%nf), stat=iret)
         if ( iret /= 0 ) then
-          write(error_unit,*) 'Allocation error on CPU ',irank
+          write(error_unit,*) 'In file ',__FILE__,' at line ',__LINE__, &
+            ' : Allocation error on CPU ',irank
           call mpi_abort(icomm,-1,iret)
           if ( iret /= 0 ) then
-            write(error_unit,*) 'THIS MUST NEVER HAPPEN !'
+            write(error_unit,*) 'In file ',__FILE__,' at line ',__LINE__, &
+              ' : THIS MUST NEVER HAPPEN !'
             call abort
           end if
         end if
@@ -256,7 +266,8 @@ module mod_solar
       integer :: i , i1 , i2 , nif
 
       if ( .not. this%isinit ) then
-        write(error_unit,*) 'Object not initialized'
+        write(error_unit,*) 'In file ',__FILE__,' at line ',__LINE__, &
+          ' : Object not initialized'
         iret = -1
         return
       end if
