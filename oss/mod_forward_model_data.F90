@@ -31,6 +31,7 @@ module mod_forward_model_data
   type atmospheric_data
     real :: skt
     real :: ps
+    real , dimension(:) , allocatable :: p
     real , dimension(:) , allocatable :: t
     real , dimension(:) , allocatable :: q
     real , dimension(:) , allocatable :: o3
